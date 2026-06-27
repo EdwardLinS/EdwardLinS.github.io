@@ -43,6 +43,19 @@
   const GAIN = 0.6;     // how strongly a disturbance maps to glyph brightness
   const WAVE_X = 0.28;  // horizontal wave-speed coefficient (wide spread)
   const WAVE_Y = 0.052; // vertical coefficient — much smaller → ripples ~2.3x wider than tall
+
+  // ---- pad-shed ring tuning (cosmetic ripples a pad emits as it bobs/drifts) ----
+  const RING_DECAY   = 0.94;    // how slowly a pad's excitation bleeds off after it stops moving
+  const RING_TRIG    = 0.0008;  // min excitation that still sheds a ring (lower = more sensitive)
+  const RING_GAIN    = 215;     // maps excitation → strength 0..1 (higher = rings from gentler motion)
+  const RING_CADENCE = 9;       // frames between successive rings from one pad
+  const RING_LIFE    = 14;      // ring lifetime in frames at zero strength…
+  const RING_LIFE_K  = 46;      // …plus this many more at full strength
+  const RING_REACH   = 1.4;     // outward growth at zero strength…
+  const RING_REACH_K = 2.4;     // …plus this much more at full strength
+  const RING_RAMP    = ".:-=";  // glyphs a ring fades through (faint → bright)
+  const GOV_CEILING  = 2.0;     // safety governor: bleed the field if mean |amplitude| exceeds this
+
   function drop(c, r, amp) {                 // bilinear deposit: spread over the 4 cells around (c,r)
     if (c < 1 || c > COLS - 2 || r < 1 || r > ROWS - 2) return;
     const c0 = Math.floor(c), r0 = Math.floor(r);
@@ -106,6 +119,17 @@
     };
   }
 
+  // one place that defines a pad's full shape: makePads and the decorative
+  // pushes both go through this, so every pad owns the same fields from birth
+  // (drift state + ripple-shedding state) — nothing gets added lazily later.
+  function newPad(o) {
+    return Object.assign({
+      u: 0, v: 0, r: 4, ph: 0, bloom: 0,   // identity: home position, size, phase, flower stage
+      ox: 0, oy: 0, vx: 0, vy: 0,          // drift: offset from home + velocity
+      exc: 0, rings: [], ringCd: 0         // ripple-shedding: excitation, live rings, cooldown
+    }, o);
+  }
+
   function makePads(n, seed) {
     const rng = mulberry32(seed);
     const lerp = (a, b, k) => a + (b - a) * k;
@@ -122,8 +146,7 @@
       const v = clamp(zig + (rng() - 0.5) * 0.12, 0.32, 0.86);
       const r = clamp(lerp(4.0, 8.6, v * v) * (0.9 + rng() * 0.3), 3.6, 8.8); // nearer = bigger
       const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
-      out.push({ u, v, r, ph: rng() * Math.PI * 2, rt: 30 + rng() * 200,
-                 ox: 0, oy: 0, vx: 0, vy: 0, bloom });
+      out.push(newPad({ u, v, r, ph: rng() * Math.PI * 2, bloom }));
     }
 
     // relax: nudge overlapping pads apart (a few cheap passes)
@@ -157,8 +180,8 @@
     pads[lm].r *= 1.28; }
   // two tiny decorative lilies tucked into the gaps — pure surface detail, not part of the type system
   pads.push(
-    { u: 0.37, v: 0.60, r: 3.0, ph: 1.3, rt: 80,  ox: 0, oy: 0, vx: 0, vy: 0, bloom: 0 },
-    { u: 0.63, v: 0.64, r: 3.2, ph: 4.1, rt: 130, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 0 }
+    newPad({ u: 0.37, v: 0.60, r: 3.0, ph: 1.3, bloom: 0 }),
+    newPad({ u: 0.63, v: 0.64, r: 3.2, ph: 4.1, bloom: 0 })
   );
 
   // ---- pad drift tuning ----
@@ -278,71 +301,75 @@
   }
 
   const rain = [];        // raindrops currently falling: {c, r, vr, hit, amp}
-  let dripT = 120;
-  function frame(t) {
-    // inject energy
-    if (ptr.on && ptr.moved) {                       // wake spread along the path travelled this frame
-      const steps = Math.max(1, Math.ceil(Math.hypot(ptr.c - ptr.pc, ptr.r - ptr.pr)));
-      for (let s = 1; s <= steps; s++) {
-        const f = s / steps;
-        drop(ptr.pc + (ptr.c - ptr.pc) * f, ptr.pr + (ptr.r - ptr.pr) * f, 0.9 / steps);
-      }
-      ptr.pc = ptr.c; ptr.pr = ptr.r; ptr.moved = false;
+  let dripT = 120;        // frames until the next raindrop
+
+  function injectCursor() {                          // deposit a wake along the path the cursor travelled this frame
+    if (!(ptr.on && ptr.moved)) return;
+    const steps = Math.max(1, Math.ceil(Math.hypot(ptr.c - ptr.pc, ptr.r - ptr.pr)));
+    for (let s = 1; s <= steps; s++) {
+      const f = s / steps;
+      drop(ptr.pc + (ptr.c - ptr.pc) * f, ptr.pr + (ptr.r - ptr.pr) * f, 0.9 / steps);
     }
-    if (--dripT <= 0) {                              // occasionally a raindrop falls into the pond
+    ptr.pc = ptr.c; ptr.pr = ptr.r; ptr.moved = false;
+  }
+
+  function updateRain() {                            // occasional raindrops: spawn, fall, and splash on impact
+    if (--dripT <= 0) {
       const c = 2 + Math.random() * (COLS - 4);
       const hit = Math.max(3, Math.round((0.5 + Math.random() * 0.45) * (ROWS - 1))); // lands lower in the scene
       rain.push({ c, r: 0, vr: 0.6 + Math.random() * 0.5, hit, amp: 5 + Math.random() * 3 });
       dripT = 200 + Math.random() * 260;
     }
-    for (let i = rain.length - 1; i >= 0; i--) {     // advance each drop; it splashes when it hits the water
+    for (let i = rain.length - 1; i >= 0; i--) {
       const d = rain[i];
       d.r += d.vr;
       if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
-    for (let i = 0; i < pads.length; i++) {          // a pad sheds a ring only when IT actually moves (gets shoved/drifts) — a wave merely passing under a still pad won't trigger one
-      const p = pads[i];
+  }
+
+  // a pad sheds a ring only when IT actually moves (gets shoved/drifts) — a wave
+  // merely passing under a still pad won't trigger one.
+  function emitPadRings(t) {
+    for (const p of pads) {
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
       const activity = Math.hypot(p.vx, p.vy);       // the pad's own drift speed this frame
-      p.exc = Math.max(activity, (p.exc || 0) * 0.94); // excitation charges with motion, then bleeds off -> rings taper instead of cutting out
+      p.exc = Math.max(activity, p.exc * RING_DECAY); // charges with motion, then bleeds off -> rings taper instead of cutting out
       const rx = p.r * (0.55 + cv * 1.1);
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
-      if (!p.rings) p.rings = [];
-      if (p.ringCd === undefined) p.ringCd = 0;
       p.ringCd--;
-      if (p.exc > 0.0008 && p.ringCd <= 0) {         // keeps shedding (ever fainter) for a moment after it settles
-        const str = Math.min(1, p.exc * 215);
-        p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
-        p.ringCd = 9;
+      if (p.exc > RING_TRIG && p.ringCd <= 0) {      // keeps shedding (ever fainter) for a moment after it settles
+        const str = Math.min(1, p.exc * RING_GAIN);
+        p.rings.push({ age: 0, maxAge: RING_LIFE + str * RING_LIFE_K, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
+        p.ringCd = RING_CADENCE;
       }
       for (let k = p.rings.length - 1; k >= 0; k--) { // age the rings out
         if (++p.rings[k].age > p.rings[k].maxAge) p.rings.splice(k, 1);
       }
     }
+  }
 
-    step();
-
-    // safety governor: the field should only ever lose energy. If anything ever
-    // pumps it upward, bleed the whole surface back down so nothing can run away.
+  // safety governor: the field should only ever lose energy. If anything ever
+  // pumps it upward, bleed the whole surface back down so nothing can run away.
+  function applyGovernor() {
     let sAbs = 0;
     for (let k = 0; k < cur.length; k += 7) sAbs += Math.abs(cur[k]);
     const meanAbs = sAbs / (cur.length / 7);
-    if (meanAbs > 2.0) {
-      const f = 2.0 / meanAbs;
+    if (meanAbs > GOV_CEILING) {
+      const f = GOV_CEILING / meanAbs;
       for (let k = 0; k < cur.length; k++) { cur[k] *= f; prev[k] *= f; }
     }
+  }
 
-    for (let i = 0; i < pads.length; i++) driftPad(pads[i], t);  // ripples shove pads, tether pulls home
-
+  // map DISTURBANCE (not absolute level) to glyphs: calm water -> blank paper,
+  // only ripple crests/troughs draw. A light 3x3 blur softens the step between
+  // adjacent ramp glyphs so the surface reads smooth, not chunky.
+  function renderWater() {
     const grid = new Array(ROWS);
     for (let r = 0; r < ROWS; r++) {
       const row = new Array(COLS);
       const o = r * COLS;
       for (let c = 0; c < COLS; c++) {
-        // map DISTURBANCE (not absolute level): calm water -> blank paper,
-        // only ripple crests/troughs draw glyphs. A light 3x3 blur softens the
-        // step between adjacent ramp glyphs so the surface reads smooth, not chunky.
         let h;
         if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1) {
           h = cur[o + c] * 0.4 +
@@ -356,47 +383,68 @@
       }
       grid[r] = row;
     }
+    return grid;
+  }
 
-    for (let i = 0; i < pads.length; i++) {          // expanding rings shed by bobbing pads — cosmetic overlay on calm water
-      const p = pads[i];
-      if (!p.rings) continue;
-      for (let j = 0; j < p.rings.length; j++) {
-        const g = p.rings[j];
+  // expanding rings shed by bobbing pads — a cosmetic overlay drawn only over
+  // blank water, so it never clobbers the wave glyphs or the pads themselves.
+  function drawPadRings(grid) {
+    for (const p of pads) {
+      for (const g of p.rings) {
         const f = g.age / g.maxAge;                  // 0 (just shed) -> 1 (faded)
-        const grow = 1 + f * (1.4 + g.str * 2.4);     // stronger disturbance pushes the ring farther out
+        const grow = 1 + f * (RING_REACH + g.str * RING_REACH_K); // stronger disturbance pushes the ring farther out
         const er = g.rx * grow, ev = g.ry * grow;
         const lvl = Math.round((1 - f) * 3 * g.str); // fades as it spreads
         if (lvl <= 0) continue;
-        const ch = ".:-="[Math.min(3, lvl)] || ".";
+        const ch = RING_RAMP[Math.min(RING_RAMP.length - 1, lvl)] || ".";
         const n = Math.max(14, Math.round((er + ev) * 1.5));
         for (let k = 0; k < n; k++) {
           const a = (k / n) * Math.PI * 2;
           const cc = Math.round(g.cx + Math.cos(a) * er);
           const rr = Math.round(g.cy + Math.sin(a) * ev);
           if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === " ")
-            grid[rr][cc] = ch;                        // only over blank water, so it never clobbers waves or pads
+            grid[rr][cc] = ch;
         }
       }
     }
+  }
 
+  function drawPads(grid, t) {                       // nearer (larger v) pads draw on top
     const order = pads.map((_, i) => i).sort((a, b) => padCenter(pads[a], t)[1] - padCenter(pads[b], t)[1]);
-    for (let i = 0; i < order.length; i++) drawPad(grid, pads[order[i]], t); // nearer pads draw on top
+    for (const i of order) drawPad(grid, pads[i], t);
+  }
 
-    for (let i = 0; i < rain.length; i++) {          // the drop itself, falling through the air toward the water
-      const d = rain[i];
+  function drawRain(grid) {                          // the drop itself, falling through the air toward the water
+    for (const d of rain) {
       const rr = Math.round(d.r), cc = Math.round(d.c);
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
         if (rr - 1 >= 0 && grid[rr - 1][cc] === " ") grid[rr - 1][cc] = "."; // faint trail above
         grid[rr][cc] = "'";                          // the teardrop
       }
     }
+  }
 
+  function serialize(grid) {                         // grid of chars -> the text the <pre> shows
     let out = "";
     for (let r = 0; r < ROWS; r++) {
       out += grid[r].join("");
       if (r < ROWS - 1) out += "\n";
     }
-    pre.textContent = out;
+    return out;
+  }
+
+  function frame(t) {
+    injectCursor();                                  // 1. add energy from the cursor…
+    updateRain();                                    //    …and the occasional raindrop
+    emitPadRings(t);                                 // 2. let moving pads shed cosmetic rings
+    step();                                          // 3. advance the wave field one tick
+    applyGovernor();                                 //    keep it from ever running away
+    for (const p of pads) driftPad(p, t);            // 4. ripples shove pads, tether pulls them home
+    const grid = renderWater();                      // 5. compose the frame, back to front:
+    drawPadRings(grid);                              //    rings on the water,
+    drawPads(grid, t);                               //    pads over them,
+    drawRain(grid);                                  //    falling drops on top
+    pre.textContent = serialize(grid);               // 6. paint
   }
 
   const start = performance.now();
