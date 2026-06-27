@@ -774,15 +774,16 @@ if (!reduceMotion) {
     return cur[r * COLS + c];
   }
 
-  // cursor in grid coordinates; leaves a continuous wake of expanding rings
-  const ptr = { c: 0, r: 0, on: false };
+  // cursor in grid coordinates; only a *moving* cursor leaves a wake (still mouse = calm)
+  const ptr = { c: 0, r: 0, on: false, moved: false };
   mount.addEventListener("pointermove", (ev) => {
     const b = mount.getBoundingClientRect();
     ptr.c = ((ev.clientX - b.left) / b.width) * COLS;
     ptr.r = ((ev.clientY - b.top) / b.height) * ROWS;
     ptr.on = true;
+    ptr.moved = true;
   });
-  mount.addEventListener("pointerleave", () => { ptr.on = false; });
+  mount.addEventListener("pointerleave", () => { ptr.on = false; ptr.moved = false; });
   mount.addEventListener("pointerdown", (ev) => {        // click = one big ring
     const b = mount.getBoundingClientRect();
     drop(((ev.clientX - b.left) / b.width) * COLS,
@@ -869,7 +870,7 @@ if (!reduceMotion) {
   let dripT = 120;
   function frame(t) {
     // inject energy
-    if (ptr.on) drop(ptr.c, ptr.r, 0.9);            // gentle wake from the moving cursor
+    if (ptr.on && ptr.moved) { drop(ptr.c, ptr.r, 0.9); ptr.moved = false; }  // wake only while moving
     if (--dripT <= 0) {                              // rare, soft idle "raindrops"
       drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), 1.3);
       dripT = 180 + Math.random() * 220;
