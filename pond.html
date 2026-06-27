@@ -1019,7 +1019,7 @@ if (!reduceMotion) {
       if (p.exc > 0.0012 && p.ringCd <= 0) {         // keeps shedding (ever fainter) for a moment after it settles
         const str = Math.min(1, p.exc * 170);
         p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
-        p.ringCd = 9;
+        p.ringCd = 5;
       }
       for (let k = p.rings.length - 1; k >= 0; k--) { // age the rings out
         if (++p.rings[k].age > p.rings[k].maxAge) p.rings.splice(k, 1);
