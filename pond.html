@@ -1021,7 +1021,8 @@ if (!reduceMotion) {
       if (p.ringCd === undefined) p.ringCd = 0;
       p.ringCd--;
       if (activity > 0.045 && p.ringCd <= 0) {       // a fresh ring leaves the rim while it's being worked
-        p.rings.push({ age: 0, maxAge: 40, cx, cy, rx, ry, str: Math.min(1, activity * 5) });
+        const str = Math.min(1, activity * 5);
+        p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
         p.ringCd = 9;
       }
       for (let k = p.rings.length - 1; k >= 0; k--) { // age the rings out
@@ -1071,7 +1072,7 @@ if (!reduceMotion) {
       for (let j = 0; j < p.rings.length; j++) {
         const g = p.rings[j];
         const f = g.age / g.maxAge;                  // 0 (just shed) -> 1 (faded)
-        const grow = 1 + f * 2.6;                    // ring widens outward from the rim
+        const grow = 1 + f * (1.4 + g.str * 2.4);     // stronger disturbance pushes the ring farther out
         const er = g.rx * grow, ev = g.ry * grow;
         const lvl = Math.round((1 - f) * 3 * g.str); // fades as it spreads
         if (lvl <= 0) continue;
