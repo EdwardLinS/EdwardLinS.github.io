@@ -799,12 +799,61 @@ if (!reduceMotion) {
   // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
   // ox/oy = current drift offset from home; vx/vy = drift velocity (normalised u/v units)
   // bloom: 0 = closed bud, 1 = small open flower, 2 = full lotus bloom
-  const pads = [
-    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 0 },
-    { u: 0.50, v: 0.68, r: 7.4, ph: 2.1, rt: 70, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 2 },
-    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 1 },
-    { u: 0.66, v: 0.26, r: 4.6, ph: 1.1, rt: 50, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 2 }
-  ];
+  // Pads are generated from a fixed seed: deterministic (no reshuffle on reload),
+  // but data-driven — change the count and the pond re-lays itself out, never overlapping.
+  const PAD_SEED = 0x5eed1eaf;
+  const PAD_COUNT = (typeof TYPES !== "undefined" ? TYPES.length : 5);
+
+  function mulberry32(a) {                            // tiny deterministic RNG
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function makePads(n, seed) {
+    const rng = mulberry32(seed);
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+    // normalised on-screen footprint of a pad (mirrors the perspective squash in drawPad)
+    const halfU = (p) => p.r * (0.55 + p.v * 1.1) * 0.0145;
+    const halfV = (p) => halfU(p) * 1.7;
+
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const col = (i + 0.5) / n;                       // spread across the width…
+      const u = clamp(col + (rng() - 0.5) * (0.7 / n), 0.08, 0.92); // …with a little jitter
+      const near = i % 2 === 0;                        // alternate depth bands for variety
+      const v = clamp((near ? 0.60 : 0.30) + (rng() - 0.5) * 0.22, 0.18, 0.80);
+      const r = clamp(lerp(3.0, 7.3, v * v) * (0.82 + rng() * 0.36), 2.8, 7.6); // nearer = bigger
+      const bloom = r >= 6 ? 2 : r >= 4 ? (rng() < 0.45 ? 2 : 1) : r >= 3.2 ? 1 : (rng() < 0.5 ? 1 : 0);
+      out.push({ u, v, r, ph: rng() * Math.PI * 2, rt: 30 + rng() * 200,
+                 ox: 0, oy: 0, vx: 0, vy: 0, bloom });
+    }
+
+    // relax: nudge overlapping pads apart in depth (a few cheap passes)
+    for (let pass = 0; pass < 6; pass++) {
+      for (let i = 0; i < out.length; i++) {
+        for (let j = i + 1; j < out.length; j++) {
+          const a = out[i], b = out[j];
+          const du = a.u - b.u, dv = a.v - b.v;
+          const su = halfU(a) + halfU(b), sv = halfV(a) + halfV(b);
+          if (Math.abs(du) < su && Math.abs(dv) < sv) {
+            const push = (sv - Math.abs(dv)) * 0.5 + 0.01;
+            const dir = dv >= 0 ? 1 : -1;
+            a.v = clamp(a.v + dir * push, 0.18, 0.80);
+            b.v = clamp(b.v - dir * push, 0.18, 0.80);
+          }
+        }
+      }
+    }
+    // closest pad sits in front: redraw order already sorts by v elsewhere
+    return out;
+  }
+
+  const pads = makePads(PAD_COUNT, PAD_SEED);
 
   // ---- pad drift tuning ----
   const PAD_PUSH = 0.006;     // how hard a passing ripple shoves a pad
@@ -965,7 +1014,8 @@ if (!reduceMotion) {
       grid[r] = row;
     }
 
-    for (let i = 0; i < pads.length; i++) drawPad(grid, pads[i], t);
+    const order = pads.map((_, i) => i).sort((a, b) => padCenter(pads[a], t)[1] - padCenter(pads[b], t)[1]);
+    for (let i = 0; i < order.length; i++) drawPad(grid, pads[order[i]], t); // nearer pads draw on top
 
     let out = "";
     for (let r = 0; r < ROWS; r++) {
