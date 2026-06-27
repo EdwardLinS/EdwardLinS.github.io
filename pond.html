@@ -752,18 +752,79 @@ if (!reduceMotion) {
   });
   mount.addEventListener("pointerleave", () => { ptr.on = false; });
 
+  // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
+  const pads = [
+    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0 },
+    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1 },
+    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2 }
+  ];
+
+  // base water height (no cursor ripple) used for pad bobbing
+  function baseH(c, r, t) {
+    const v = r / (ROWS - 1);
+    const wy = v * v * 7.0;
+    const spread = 0.45 + 0.9 * v;
+    const fy = 1.1 + (1 - v) * 1.4;
+    const u = c / (COLS - 1);
+    const wx = (u - 0.5) * (COLS * CELL_W / 60) / spread;
+    return Math.sin(wx * 1.05 + t * 0.9)
+         + Math.sin(wy * fy - t * 0.75) * 0.8
+         + Math.sin((wx * 0.7 + wy) + t * 0.5) * 0.45;
+  }
+
+  function drawPad(grid, pad, t) {
+    const cu = pad.u + Math.sin(t * 0.08 + pad.ph) * 0.022;
+    const cv = pad.v + Math.sin(t * 0.11 + pad.ph) * 0.010;
+    const cx = cu * (COLS - 1);
+    let cy = cv * (ROWS - 1);
+    cy += baseH(cx, cy, t) * 0.6;                 // bob on the swell
+
+    const rx = pad.r * (0.55 + cv * 1.1);          // nearer pads are larger
+    const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
+    const NOTCH = Math.PI / 2;                      // notch faces the viewer (down)
+
+    const r0 = Math.max(0, Math.floor(cy - ry - 2));
+    const r1 = Math.min(ROWS - 1, Math.ceil(cy + ry + 2));
+    const c0 = Math.max(0, Math.floor(cx - rx - 1));
+    const c1 = Math.min(COLS - 1, Math.ceil(cx + rx + 1));
+
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const ex = (c - cx) / rx;
+        const ey = (r - cy) / ry;                  // positive = toward viewer
+        const dd = ex * ex + ey * ey;
+
+        if (dd > 1) {
+          // dark underside edge along the lower rim for thickness
+          if (dd < 1.5 && ey > 0.1) grid[r][c] = "#";
+          continue;
+        }
+        const ang = Math.atan2(ey, ex);
+        if (dd > 0.2 && Math.abs(ang - NOTCH) < 0.45) continue; // cut the notch
+
+        if (dd > 0.80) {
+          grid[r][c] = ey < -0.3 ? "=" : "@";      // upper rim catches light
+        } else if (dd < 0.05) {
+          grid[r][c] = "o";                          // center bud
+        } else {
+          grid[r][c] = (ex < -0.15 && ey < -0.15) ? ":" : "+"; // highlight vs body
+        }
+      }
+    }
+  }
+
   function frame(t) {
     // ease the ripple energy in/out so it feels like a disturbed surface
     ptr.e += ((ptr.on ? 1 : 0) - ptr.e) * 0.06;
 
-    let out = "";
+    const grid = new Array(ROWS);
     for (let r = 0; r < ROWS; r++) {
-      // v: 0 at far top, 1 at near bottom. Perspective compresses the top.
       const v = r / (ROWS - 1);
-      const depth = v * v;                       // non-linear: rows bunch up far away
-      const wy = depth * 7.0;                    // world Y (compressed toward top)
-      const spread = 0.45 + 0.9 * v;             // rows near the viewer span more world X
-      const fy = 1.1 + (1 - v) * 1.4;            // higher wave frequency far away
+      const depth = v * v;
+      const wy = depth * 7.0;
+      const spread = 0.45 + 0.9 * v;
+      const fy = 1.1 + (1 - v) * 1.4;
+      const row = new Array(COLS);
       for (let c = 0; c < COLS; c++) {
         const u = c / (COLS - 1);
         const wx = (u - 0.5) * (COLS * CELL_W / 60) / spread;
@@ -774,16 +835,24 @@ if (!reduceMotion) {
 
         if (ptr.e > 0.01) {
           const dx = c - ptr.c;
-          const dy = (r - ptr.r) * 2.0;          // chars are ~2:1, keep ripple circular on screen
+          const dy = (r - ptr.r) * 2.0;
           const d = Math.sqrt(dx * dx + dy * dy);
           const fall = Math.max(0, 1 - d / 22);
           hgt += Math.sin(d * 0.55 - t * 5) * fall * fall * 2.2 * ptr.e;
         }
 
-        let n = (hgt + 2.7) / 5.4;               // normalize to 0..1
+        let n = (hgt + 2.7) / 5.4;
         if (n < 0) n = 0; else if (n > 1) n = 1;
-        out += RAMP[(n * (RAMP.length - 1)) | 0];
+        row[c] = RAMP[(n * (RAMP.length - 1)) | 0];
       }
+      grid[r] = row;
+    }
+
+    for (let i = 0; i < pads.length; i++) drawPad(grid, pads[i], t);
+
+    let out = "";
+    for (let r = 0; r < ROWS; r++) {
+      out += grid[r].join("");
       if (r < ROWS - 1) out += "\n";
     }
     pre.textContent = out;
