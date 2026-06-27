@@ -747,7 +747,7 @@ if (!reduceMotion) {
   // ---- wave engine: each cell relaxes toward the mean of its neighbours,
   //      minus its previous value, with damping. A local rule that radiates. ----
   const DAMP = 0.96;    // 1 = no energy loss; lower = ripples fade sooner
-  const GAIN = 0.42;    // how strongly height maps to glyph brightness
+  const GAIN = 0.6;     // how strongly a disturbance maps to glyph brightness
   function drop(c, r, amp) {
     c |= 0; r |= 0;
     if (c < 1 || c >= COLS - 1 || r < 1 || r >= ROWS - 1) return;
@@ -857,9 +857,10 @@ if (!reduceMotion) {
       const row = new Array(COLS);
       const o = r * COLS;
       for (let c = 0; c < COLS; c++) {
-        const amb = Math.sin(c * 0.5 + r * 0.9 + t * 0.7) * 0.04; // barely-there texture
-        let n = 0.5 + (cur[o + c] * GAIN) + amb;
-        if (n < 0) n = 0; else if (n > 1) n = 1;
+        // map DISTURBANCE (not absolute level): calm water -> blank paper,
+        // only ripple crests/troughs draw glyphs.
+        let n = Math.abs(cur[o + c]) * GAIN;
+        if (n > 1) n = 1;
         row[c] = RAMP[(n * (RAMP.length - 1)) | 0];
       }
       grid[r] = row;
