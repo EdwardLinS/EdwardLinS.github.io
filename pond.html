@@ -748,10 +748,14 @@ if (!reduceMotion) {
   window.addEventListener("resize", resize);
 
   // ---- wave engine: each cell relaxes toward the mean of its neighbours,
-  //      minus its previous value, with damping. A local rule that radiates. ----
-  const DAMP = 0.96;    // 1 = no energy loss; lower = ripples fade sooner
+  //      minus its previous value, with damping. A local rule that radiates.
+  //      Horizontal coupling >> vertical, so a point disturbance spreads as a
+  //      flattened ellipse — the SAME perspective squash the lily pads use, so
+  //      ripples read as lying on the tilted water plane, not as flat circles. ----
+  const DAMP = 0.965;   // 1 = no energy loss; lower = ripples fade sooner
   const GAIN = 0.6;     // how strongly a disturbance maps to glyph brightness
-  const WAVE = 0.20;    // wave-speed coefficient (0.5 = fastest stable; lower = slower ripples)
+  const WAVE_X = 0.28;  // horizontal wave-speed coefficient (wide spread)
+  const WAVE_Y = 0.052; // vertical coefficient — much smaller → ripples ~2.3x wider than tall
   function drop(c, r, amp) {                 // bilinear deposit: spread over the 4 cells around (c,r)
     if (c < 1 || c > COLS - 2 || r < 1 || r > ROWS - 2) return;
     const c0 = Math.floor(c), r0 = Math.floor(r);
@@ -766,8 +770,9 @@ if (!reduceMotion) {
       const o = r * COLS;
       for (let c = 1; c < COLS - 1; c++) {
         const i = o + c;
-        const lap = cur[i - 1] + cur[i + 1] + cur[i - COLS] + cur[i + COLS] - 4 * cur[i];
-        let v = 2 * cur[i] - prev[i] + WAVE * lap;   // discrete wave eqn; WAVE sets speed
+        const lapx = cur[i - 1] + cur[i + 1] - 2 * cur[i];      // horizontal curvature
+        const lapy = cur[i - COLS] + cur[i + COLS] - 2 * cur[i]; // vertical curvature
+        let v = 2 * cur[i] - prev[i] + WAVE_X * lapx + WAVE_Y * lapy; // anisotropic wave eqn
         prev[i] = v * DAMP;
       }
     }
@@ -1000,21 +1005,25 @@ if (!reduceMotion) {
       d.r += d.vr;
       if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
-    for (let i = 0; i < pads.length; i++) {          // pads disturb the surface as they sit and bob
+    for (let i = 0; i < pads.length; i++) {          // a disturbed pad sheds its own rings — only when the water moves it
       const p = pads[i];
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
       const rx = p.r * (0.55 + cv * 1.1);            // footprint radius in cells (mirrors drawPad)
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
       const speed = Math.hypot(p.vx, p.vy);          // how vigorously it's drifting right now
-      if (--p.rt <= 0) {
-        const amp = 0.16 * (p.r / PAD_REF_R) * (1 + speed * 120); // bigger pad + more motion = stronger ring
-        const n = Math.max(8, Math.round(rx + ry));
-        for (let k = 0; k < n; k++) {                // shed a faint ring out from the rim
+      // disturbance = the swell passing under the pad + its own drift. Calm water => ~0 => no ripple.
+      const disturb = Math.abs(heightAt(cx | 0, cy | 0)) + speed * 220;
+      p.rt -= 1 + disturb * 6;                        // ripples come faster the more the pad is tossed
+      if (p.rt <= 0 && disturb > 0.18) {
+        let amp = 0.5 * (p.r / PAD_REF_R) * disturb;  // ring strength tracks how hard it's bobbing
+        if (amp > 1.1) amp = 1.1;
+        const n = Math.max(10, Math.round((rx + ry) * 1.2));
+        for (let k = 0; k < n; k++) {                // shed an elliptical ring out from the rim
           const a = (k / n) * Math.PI * 2;
-          drop(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, amp);
+          drop(cx + Math.cos(a) * rx * 1.08, cy + Math.sin(a) * ry * 1.08, amp);
         }
-        p.rt = 64 + Math.random() * 70;              // next ring soon, so the pad keeps breathing
+        p.rt = 26 + Math.random() * 24;
       }
     }
 
