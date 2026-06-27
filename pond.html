@@ -1010,13 +1010,14 @@ if (!reduceMotion) {
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
       const activity = Math.hypot(p.vx, p.vy);       // the pad's own drift speed this frame
+      p.exc = Math.max(activity, (p.exc || 0) * 0.94); // excitation charges with motion, then bleeds off -> rings taper instead of cutting out
       const rx = p.r * (0.55 + cv * 1.1);
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
       if (!p.rings) p.rings = [];
       if (p.ringCd === undefined) p.ringCd = 0;
       p.ringCd--;
-      if (activity > 0.0012 && p.ringCd <= 0) {      // a fresh ring leaves the rim while it's being shoved
-        const str = Math.min(1, activity * 170);
+      if (p.exc > 0.0012 && p.ringCd <= 0) {         // keeps shedding (ever fainter) for a moment after it settles
+        const str = Math.min(1, p.exc * 170);
         p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
         p.ringCd = 9;
       }
