@@ -227,6 +227,91 @@
       if (p.oy > PAD_MAXOFF) p.oy = PAD_MAXOFF; else if (p.oy < -PAD_MAXOFF) p.oy = -PAD_MAXOFF;
     }
 
+    // ---- the duck: one little visitor that paddles a slow lane across the pond,
+    //      shedding a real wake into the wave field as it goes. Lives in the same
+    //      normalised u/v space as the pads, so it reprojects on resize and sorts
+    //      into the same front-to-back draw order. ----
+    const DUCK_SPEED = 0.0011;   // normalised u travelled per frame (slow glide)
+    const DUCK_WAKE_AMP = 0.6;     // how hard the rib nearest the duck dents the water
+    const DUCK_WAKE_LEN = 8;       // how many ribs trail behind (longer = longer wake)
+    const DUCK_WAKE_SPREAD = 0.62; // how fast the two arms fan apart into a V
+    const DUCK_WAKE_FALLOFF = 2.0; // >1 makes the far end fade out faster than the near end
+    const DUCK_AWAY_MIN = 30;    // seconds out of sight between visits…
+    const DUCK_AWAY_MAX = 75;    // …picked at random, so the duck is an occasional guest
+    const DUCK_BOB = 0.35;       // how much it rides ripples (kept low so it glides, not jitters)
+    const DUCK_RIGHT = ["       __", "      ( o)>", "   __/", "(________)"]; // head lifted high on a long neck, long back behind…
+    const DUCK_LEFT  = ["  __", "<(o )", "     \\__", "(________)"];         // …mirrored when it turns back
+    const duck = {
+      present: false,                      // most of the time the pond is duckless
+      nextAt: 6 + Math.random() * 12,      // first visit a little after the page settles
+      u: 0,                                // set when it enters from an edge
+      v: 0.56,                             // mid-near depth so its fixed size reads
+      ph: Math.random() * Math.PI * 2,
+      dir: 1,                              // heading: +1 = right, -1 = left
+      bob: null,                           // smoothed vertical offset (eased toward the ripples)
+      wakeCd: 0
+    };
+
+    function spawnDuck() {                              // glide in from one edge, heading across
+      duck.dir = Math.random() < 0.5 ? 1 : -1;
+      duck.u = duck.dir === 1 ? -0.06 : 1.06;          // just off the entering edge
+      duck.ph = Math.random() * Math.PI * 2;
+      duck.bob = null;                                 // settle onto the water on the first frame
+      duck.wakeCd = 0;
+      duck.present = true;
+    }
+
+    function duckCenter(t) {                            // home lane + a gentle depth bob
+      return [duck.u, duck.v + Math.sin(t * 0.6 + duck.ph) * 0.006];
+    }
+
+    function updateDuck(t) {                            // appear now and then, paddle across, then leave
+      if (!duck.present) {
+        if (t >= duck.nextAt) spawnDuck();
+        return;
+      }
+      duck.u += duck.dir * DUCK_SPEED;
+      if (duck.u > 1.06 || duck.u < -0.06) {           // glided off the far edge → gone for a while
+        duck.present = false;
+        duck.nextAt = t + DUCK_AWAY_MIN + Math.random() * (DUCK_AWAY_MAX - DUCK_AWAY_MIN);
+        return;
+      }
+      if (--duck.wakeCd <= 0) {                         // shed a V-shaped (Kelvin) wake fanning out behind the tail
+        const [cu, cv] = duckCenter(t);
+        const bx = cu * (COLS - 1), by = cv * (ROWS - 1);
+        for (let k = 0; k < DUCK_WAKE_LEN; k++) {
+          const backX = bx - duck.dir * (3 + k * 2.0); // each rib sits further behind…
+          const spread = (k + 1) * DUCK_WAKE_SPREAD;   // …and the two arms diverge into a V
+          const amp = DUCK_WAKE_AMP * Math.pow(1 - k / DUCK_WAKE_LEN, DUCK_WAKE_FALLOFF); // dense by the duck, fading to a thin tail
+          drop(backX, by - spread, amp);               // upper arm (toward the far shore)
+          drop(backX, by + spread, amp);               // lower arm (toward the viewer)
+        }
+        duck.wakeCd = 3;
+      }
+    }
+
+    function drawDuck(grid, t) {
+      const [cu, cv] = duckCenter(t);
+      const cx = cu * (COLS - 1);
+      const base = cv * (ROWS - 1);
+      const target = base + heightAt(cx, base) * DUCK_BOB; // sample the still row, not the moving sprite (no self-feedback)
+      if (duck.bob == null) duck.bob = target;
+      duck.bob += (target - duck.bob) * 0.18;              // low-pass: ease onto ripples instead of snapping rows
+      const spr = duck.dir >= 0 ? DUCK_RIGHT : DUCK_LEFT;
+      const colStart = Math.round(cx) - 4;              // 10-wide hull, centred on the duck
+      const baseRow = Math.round(duck.bob);             // body row sits on the waterline
+      for (let rr = 0; rr < spr.length; rr++) {
+        const row = spr[rr];
+        const gr = baseRow - (spr.length - 1) + rr;
+        for (let cc = 0; cc < row.length; cc++) {
+          const ch = row[cc];
+          if (ch === " ") continue;                     // spaces are transparent: water shows through
+          const gc = colStart + cc;
+          if (gr >= 0 && gr < ROWS && gc >= 0 && gc < COLS) grid[gr][gc] = ch;
+        }
+      }
+    }
+
     function drawPad(grid, pad, t) {
       const [cu, cv] = padCenter(pad, t);
       const cx = cu * (COLS - 1);
@@ -417,9 +502,11 @@
       }
     }
 
-    function drawPads(grid, t) {                       // nearer (larger v) pads draw on top
-      const order = pads.map((_, i) => i).sort((a, b) => padCenter(pads[a], t)[1] - padCenter(pads[b], t)[1]);
-      for (const i of order) drawPad(grid, pads[i], t);
+    function drawPads(grid, t) {                       // nearer (larger v) pads draw on top; the duck sorts into the same order
+      const order = pads.map((_, i) => ({ v: padCenter(pads[i], t)[1], i }));
+      if (duck.present) order.push({ v: duckCenter(t)[1], i: -1 }); // -1 marks the duck (only when it's visiting)
+      order.sort((a, b) => a.v - b.v);
+      for (const o of order) (o.i === -1 ? drawDuck(grid, t) : drawPad(grid, pads[o.i], t));
     }
 
     function drawRain(grid) {                          // the drop itself, falling through the air toward the water
@@ -444,6 +531,7 @@
     function frame(t) {
       injectCursor();                                  // 1. add energy from the cursor…
       updateRain();                                    //    …and the occasional raindrop
+      updateDuck(t);                                   //    …and the duck paddling its wake
       emitPadRings(t);                                 // 2. let moving pads shed cosmetic rings
       step();                                          // 3. advance the wave field one tick
       applyGovernor();                                 //    keep it from ever running away
