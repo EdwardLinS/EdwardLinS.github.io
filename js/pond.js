@@ -456,14 +456,30 @@
     }
 
     const start = performance.now();
-    let rafId = 0;
-    (function loop(now) {
+    let rafId = 0, running = false;
+    function loop(now) {
+      if (!running) return;
       frame((now - start) / 1000);
       rafId = requestAnimationFrame(loop);
-    })(start);
+    }
+    function startLoop() { if (!running) { running = true; rafId = requestAnimationFrame(loop); } }
+    function stopLoop() { if (running) { running = false; cancelAnimationFrame(rafId); } }
+
+    // Only animate while the pond is on screen — it sits near the top, so it's
+    // often scrolled past. Pausing the rAF loop then spares the CPU (and battery).
+    let io = null;
+    if ("IntersectionObserver" in window) {
+      io = new IntersectionObserver(
+        (entries) => { entries[entries.length - 1].isIntersecting ? startLoop() : stopLoop(); },
+        { rootMargin: "150px 0px" }   // wake a little before it scrolls into view
+      );
+      io.observe(el);
+    }
+    startLoop();                       // paint immediately; the observer pauses it if off screen
 
     function destroy() {
-      cancelAnimationFrame(rafId);
+      stopLoop();
+      if (io) io.disconnect();
       window.removeEventListener("resize", resize);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerleave", onLeave);
