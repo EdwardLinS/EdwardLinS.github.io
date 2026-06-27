@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Edward Lin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="pond"></div>
+
+  <main class="page">
+    <div class="head">
+      <span class="prompt">edward lin <span class="dim">~/index</span><span class="cursor"></span></span>
+      <span class="now" id="now">—</span>
+    </div>
+
+    <h1 class="lede">A quiet index of things I make, tend, and chase.</h1>
+    <p class="opening"><span class="drop">I keep my work the way some people keep a garden</span> — in categories that are mine, not the industry's. Five of them. Each holds a few finished things, a few unfinished ones, and whatever I happen to be circling this week. Choose a word and stay a while.</p>
+
+    <div id="asciipond" class="asciipond" aria-hidden="true"><div class="rr-fallback">~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~</div></div>
+
+    <div class="body">
+      <nav class="index" id="index">
+        <div class="ix-h">the five</div>
+      </nav>
+      <section class="reading" id="reading" tabindex="-1"></section>
+    </div>
+  </main>
+
+  <footer class="colophon">
+    <pre class="endmark" aria-hidden="true"> .-~-.
+(  +  &lt;
+ '-~-'</pre>
+    <p class="sign">I'd rather make five true things slowly than fifty quick ones. This is where I keep them, and what I'm circling next.</p>
+    <div class="grid">
+      <span>Set in <b>Playfair Display</b> &amp; <b>JetBrains Mono</b></span>
+      <span>Paper, not pixels — no. <b>006</b></span>
+      <nav>
+        <a href="#">work</a>
+        <a href="#">writing</a>
+        <a href="#">contact</a>
+      </nav>
+    </div>
+  </footer>
+
+  <div class="statusbar">
+    <span class="hints"><kbd>↑↓</kbd> move <kbd>1–5</kbd> jump <kbd>↵</kbd> open</span>
+    <span class="pos" id="pos">—</span>
+  </div>
+
+  <script src="js/content.js"></script>
+  <script src="js/index.js"></script>
+  <script src="js/pond.js"></script>
+</body>
+</html>
