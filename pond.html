@@ -1005,23 +1005,18 @@ if (!reduceMotion) {
       d.r += d.vr;
       if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
-    for (let i = 0; i < pads.length; i++) {          // when the swell BOBS a pad, it sheds an expanding ring (drawn over the water, never fed into the sim -> cannot run away)
+    for (let i = 0; i < pads.length; i++) {          // a pad sheds a ring only when IT actually moves (gets shoved/drifts) — a wave merely passing under a still pad won't trigger one
       const p = pads[i];
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
-      const h = heightAt(cx | 0, cy | 0);            // surface height under the pad right now
-      if (p.prevH === undefined) p.prevH = h;
-      const bobVel = Math.abs(h - p.prevH);          // how fast it's rising/falling this frame
-      p.prevH = h;
-      const speed = Math.hypot(p.vx, p.vy);
-      const activity = bobVel + speed * 60;          // total motion that would shed a ripple
+      const activity = Math.hypot(p.vx, p.vy);       // the pad's own drift speed this frame
       const rx = p.r * (0.55 + cv * 1.1);
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
       if (!p.rings) p.rings = [];
       if (p.ringCd === undefined) p.ringCd = 0;
       p.ringCd--;
-      if (activity > 0.045 && p.ringCd <= 0) {       // a fresh ring leaves the rim while it's being worked
-        const str = Math.min(1, activity * 5);
+      if (activity > 0.0012 && p.ringCd <= 0) {      // a fresh ring leaves the rim while it's being shoved
+        const str = Math.min(1, activity * 170);
         p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
         p.ringCd = 9;
       }
