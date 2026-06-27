@@ -845,7 +845,8 @@ if (!reduceMotion) {
     const NOTCH = Math.PI / 2;                      // notch faces the viewer (down)
     const SLIT = 0.16;                              // half-width of the notch slit
     const isBloom = pad.bloom >= 1 && rx > 2.2;     // big enough to hold an open flower
-    const BLOOM_CORE = 0.5;                          // how much of the leaf the bloom fills
+    const bigBloom = isBloom && ry >= 2.4;           // enough room for a layered lotus
+    const bedCore = bigBloom ? 0.78 : (isBloom ? 0.34 : 0); // cleared flower bed size
 
     const r0 = Math.max(0, Math.floor(cy - ry - 2));
     const r1 = Math.min(ROWS - 1, Math.ceil(cy + ry + 2));
@@ -867,7 +868,7 @@ if (!reduceMotion) {
 
         if (dd > 0.82) {
           grid[r][c] = ey < -0.35 ? "=" : "@";     // upper rim catches light
-        } else if (isBloom && dd < BLOOM_CORE) {
+        } else if (isBloom && dd < bedCore) {
           grid[r][c] = " ";                          // clear an open bed for the bloom
         } else {
           grid[r][c] = "+";                          // leaf body
@@ -881,7 +882,7 @@ if (!reduceMotion) {
       const rr = bcy + dr, cc = bcx + dc;
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
     };
-    if (isBloom && ry >= 2.4) {
+    if (bigBloom) {
       const spoke = (a) => {                          // stroke aligned to the radial direction
         const dx = Math.cos(a), dy = Math.sin(a);
         if (Math.abs(dx) > 2.2 * Math.abs(dy)) return "-";
@@ -895,9 +896,11 @@ if (!reduceMotion) {
               Math.round(ry * radF * Math.sin(a)), ch === null ? spoke(a) : ch);
         }
       };
-      if (pad.bloom > 1) ring(0.66, 8, Math.PI / 8, "."); // outer petal tips
-      ring(0.36, 8, 0, null);                         // inner pointed petals
-      put(0, 0, "@");                                 // golden heart
+      // two interleaved rings of pointed petals = layered lotus
+      if (pad.bloom > 1) ring(0.66, 6, Math.PI / 6, null); // outer petal layer, offset
+      ring(0.34, 6, 0, null);                         // inner petal layer
+      // seed-pod heart: a tiny dotted disc
+      put(0, 0, "@"); put(-1, 0, "."); put(1, 0, ".");
     } else if (isBloom) {
       put(0, 0, "o"); put(-1, 0, "."); put(1, 0, "."); // tiny flower on a small pad
     } else {
