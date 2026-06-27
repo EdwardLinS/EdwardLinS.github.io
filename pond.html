@@ -796,10 +796,10 @@ if (!reduceMotion) {
   ];
 
   // ---- pad drift tuning ----
-  const PAD_PUSH = 0.0009;    // how hard a passing ripple shoves a pad
-  const PAD_SPRING = 0.018;   // tether pulling each pad back to its home position
-  const PAD_FRICTION = 0.86;  // velocity damping (lower = settles sooner)
-  const PAD_MAXOFF = 0.05;    // max drift from home (fraction of band), keeps pads from wandering
+  const PAD_PUSH = 0.006;     // how hard a passing ripple shoves a pad
+  const PAD_SPRING = 0.013;   // tether pulling each pad back to its home position
+  const PAD_FRICTION = 0.88;  // velocity damping (lower = settles sooner)
+  const PAD_MAXOFF = 0.09;    // max drift from home (fraction of band), keeps pads from wandering
 
   // live centre of a pad: home + slow idle drift + ripple-driven offset
   function padCenter(p, t) {
@@ -808,9 +808,10 @@ if (!reduceMotion) {
     return [cu, cv];
   }
 
-  function driftPad(p) {                              // shove from wave slope, then spring home
-    const cx = (p.u + p.ox) * (COLS - 1);
-    const cy = (p.v + p.oy) * (ROWS - 1);
+  function driftPad(p, t) {                           // shove from wave slope, then spring home
+    const [cu, cv] = padCenter(p, t);
+    const cx = cu * (COLS - 1);
+    const cy = cv * (ROWS - 1);
     const gx = heightAt(cx + 1, cy) - heightAt(cx - 1, cy);   // surface slope (gradient)
     const gy = heightAt(cx, cy + 1) - heightAt(cx, cy - 1);
     p.vx += PAD_PUSH * gx - PAD_SPRING * p.ox;
@@ -881,7 +882,7 @@ if (!reduceMotion) {
 
     step();
 
-    for (let i = 0; i < pads.length; i++) driftPad(pads[i]);  // ripples shove pads, tether pulls home
+    for (let i = 0; i < pads.length; i++) driftPad(pads[i], t);  // ripples shove pads, tether pulls home
 
     const grid = new Array(ROWS);
     for (let r = 0; r < ROWS; r++) {
