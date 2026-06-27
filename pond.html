@@ -718,7 +718,7 @@ if (!reduceMotion) {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const RAMP = " .,:;-=+ox*#%@";
-  const FONT = 10;          // glyph size in px (smaller = denser grid)
+  const FONT = 8;           // glyph size in px (smaller = denser grid)
   const CELL_W = FONT * 0.6; // mono advance width approx
   const CELL_H = FONT * 0.92; // tighter line height packs more rows
 
@@ -907,8 +907,16 @@ if (!reduceMotion) {
       const o = r * COLS;
       for (let c = 0; c < COLS; c++) {
         // map DISTURBANCE (not absolute level): calm water -> blank paper,
-        // only ripple crests/troughs draw glyphs.
-        let n = Math.abs(cur[o + c]) * GAIN;
+        // only ripple crests/troughs draw glyphs. A light 3x3 blur softens the
+        // step between adjacent ramp glyphs so the surface reads smooth, not chunky.
+        let h;
+        if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1) {
+          h = cur[o + c] * 0.4 +
+              (cur[o + c - 1] + cur[o + c + 1] + cur[o + c - COLS] + cur[o + c + COLS]) * 0.15;
+        } else {
+          h = cur[o + c];
+        }
+        let n = Math.abs(h) * GAIN;
         if (n > 1) n = 1;
         row[c] = RAMP[(n * (RAMP.length - 1)) | 0];
       }
