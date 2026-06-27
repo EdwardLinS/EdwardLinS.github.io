@@ -977,6 +977,7 @@ if (!reduceMotion) {
     }
   }
 
+  const rain = [];        // raindrops currently falling: {c, r, vr, hit, amp}
   let dripT = 120;
   function frame(t) {
     // inject energy
@@ -988,9 +989,16 @@ if (!reduceMotion) {
       }
       ptr.pc = ptr.c; ptr.pr = ptr.r; ptr.moved = false;
     }
-    if (--dripT <= 0) {                              // rare, soft idle "raindrops"
-      drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), 4.5);
-      dripT = 180 + Math.random() * 220;
+    if (--dripT <= 0) {                              // occasionally a raindrop falls into the pond
+      const c = 2 + Math.random() * (COLS - 4);
+      const hit = Math.max(3, Math.round((0.5 + Math.random() * 0.45) * (ROWS - 1))); // lands lower in the scene
+      rain.push({ c, r: 0, vr: 0.6 + Math.random() * 0.5, hit, amp: 5 + Math.random() * 3 });
+      dripT = 200 + Math.random() * 260;
+    }
+    for (let i = rain.length - 1; i >= 0; i--) {     // advance each drop; it splashes when it hits the water
+      const d = rain[i];
+      d.r += d.vr;
+      if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
     for (let i = 0; i < pads.length; i++) {          // pads disturb the surface as they sit and bob
       const p = pads[i];
@@ -1038,6 +1046,15 @@ if (!reduceMotion) {
 
     const order = pads.map((_, i) => i).sort((a, b) => padCenter(pads[a], t)[1] - padCenter(pads[b], t)[1]);
     for (let i = 0; i < order.length; i++) drawPad(grid, pads[order[i]], t); // nearer pads draw on top
+
+    for (let i = 0; i < rain.length; i++) {          // the drop itself, falling through the air toward the water
+      const d = rain[i];
+      const rr = Math.round(d.r), cc = Math.round(d.c);
+      if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+        if (rr - 1 >= 0 && grid[rr - 1][cc] === " ") grid[rr - 1][cc] = "."; // faint trail above
+        grid[rr][cc] = "'";                          // the teardrop
+      }
+    }
 
     let out = "";
     for (let r = 0; r < ROWS; r++) {
