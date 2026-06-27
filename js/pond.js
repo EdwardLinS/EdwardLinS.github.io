@@ -232,10 +232,11 @@
     //      normalised u/v space as the pads, so it reprojects on resize and sorts
     //      into the same front-to-back draw order. ----
     const DUCK_SPEED = 0.0011;   // normalised u travelled per frame (slow glide)
-    const DUCK_WAKE_AMP = 0.6;     // how hard the rib nearest the duck dents the water
-    const DUCK_WAKE_LEN = 8;       // how many ribs trail behind (longer = longer wake)
-    const DUCK_WAKE_SPREAD = 0.62; // how fast the two arms fan apart into a V
-    const DUCK_WAKE_FALLOFF = 2.0; // >1 makes the far end fade out faster than the near end
+    const DUCK_WAKE_AMP = 0.6;     // brightness of the rib nearest the duck
+    const DUCK_WAKE_LEN = 13;      // how many ribs trail behind (longer = longer wake)
+    const DUCK_WAKE_SPREAD = 0.5;  // how fast the two arms fan apart into a V
+    const DUCK_WAKE_FALLOFF = 3.0; // >1 shrinks the bright near part, fading fast into a faint tail
+    const DUCK_WISP = 0.18;        // floor brightness of the broken specks far out (so they still register)
     const DUCK_AWAY_MIN = 30;    // seconds out of sight between visits…
     const DUCK_AWAY_MAX = 75;    // …picked at random, so the duck is an occasional guest
     const DUCK_BOB = 0.35;       // how much it rides ripples (kept low so it glides, not jitters)
@@ -276,15 +277,21 @@
         duck.nextAt = t + DUCK_AWAY_MIN + Math.random() * (DUCK_AWAY_MAX - DUCK_AWAY_MIN);
         return;
       }
-      if (--duck.wakeCd <= 0) {                         // shed a V-shaped (Kelvin) wake fanning out behind the tail
+      if (--duck.wakeCd <= 0) {                         // shed a V-shaped wake: crisp by the duck, fraying to wisps far out
         const [cu, cv] = duckCenter(t);
         const bx = cu * (COLS - 1), by = cv * (ROWS - 1);
         for (let k = 0; k < DUCK_WAKE_LEN; k++) {
-          const backX = bx - duck.dir * (3 + k * 2.0); // each rib sits further behind…
+          const f = k / (DUCK_WAKE_LEN - 1);           // 0 at the duck → 1 at the tail
+          const backX = bx - duck.dir * (3 + k * 2.2); // each rib sits further behind…
           const spread = (k + 1) * DUCK_WAKE_SPREAD;   // …and the two arms diverge into a V
-          const amp = DUCK_WAKE_AMP * Math.pow(1 - k / DUCK_WAKE_LEN, DUCK_WAKE_FALLOFF); // dense by the duck, fading to a thin tail
-          drop(backX, by - spread, amp);               // upper arm (toward the far shore)
-          drop(backX, by + spread, amp);               // lower arm (toward the viewer)
+          const amp = Math.max(DUCK_WAKE_AMP * Math.pow(1 - f, DUCK_WAKE_FALLOFF), DUCK_WISP);
+          const jit = f * f;                            // ends scatter; the head stays crisp
+          for (const s of [-1, 1]) {                    // two arms…
+            if (k > 2 && Math.random() < f * 0.8) continue; // …fray into broken wisps further out
+            const jx = backX + (Math.random() - 0.5) * jit * 4;
+            const jy = by + s * spread + (Math.random() - 0.5) * jit * 3;
+            drop(jx, jy, amp);
+          }
         }
         duck.wakeCd = 3;
       }
