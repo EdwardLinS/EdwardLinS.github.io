@@ -203,7 +203,7 @@
   }
   .word.active .w-meta { color: var(--soft); opacity: 1; }
   .word:focus-visible {
-    outline: 1px solid var(--hair);
+    outline: 1px solid var(--soft);
     outline-offset: 6px;
   }
   .word .mark {
@@ -316,6 +316,81 @@
     margin-top: 9px;
   }
   .entry .state::before { content: "— "; color: var(--faint); }
+
+  /* ---------- expandable items ---------- */
+  .entry.has-more { cursor: pointer; }
+  .entry-toggle {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    background: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+  }
+  .entry-toggle::after {
+    content: "+";
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    margin-left: 11px;
+    vertical-align: 1px;
+    transition: color var(--ease-quiet);
+  }
+  .entry-toggle[aria-expanded="true"]::after { content: "–"; }
+  .entry.has-more:hover h3 {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--hair);
+  }
+  .entry.has-more:hover .entry-toggle::after { color: var(--soft); }
+  .entry-toggle:focus-visible {
+    outline: 1px solid var(--soft);
+    outline-offset: 4px;
+    border-radius: 1px;
+  }
+  .entry-more {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.34s cubic-bezier(.22, .61, .36, 1),
+                opacity 0.3s ease;
+  }
+  .entry-more .em-in { overflow: hidden; min-height: 0; }
+  .entry-more.open { grid-template-rows: 1fr; opacity: 1; }
+  .entry-more .more {
+    font-family: var(--serif);
+    font-size: 16.25px;
+    line-height: 1.56;
+    color: rgba(26, 23, 20, 0.82);
+    margin: 12px 0 0;
+    cursor: auto;
+  }
+  .entry-more .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 13px;
+  }
+  .entry-more .xlink {
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--soft);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--ease-quiet);
+  }
+  .entry-more .xlink::before { content: "↗ "; color: var(--faint); }
+  .entry-more .xlink:hover { color: var(--ink); }
+  .entry-more .xlink:focus-visible {
+    outline: 1px solid var(--soft);
+    outline-offset: 3px;
+  }
 
   /* ---------- currently into (tree view) ---------- */
   .into { margin-top: 8px; }
@@ -439,6 +514,7 @@
     #pond { display: none; }
     .head .cursor { animation: none; }
     .reading.fade { animation: none; }
+    .entry-more { transition: none; }
     .word, .w-name, .w-meta, .word .mark { transition: none; }
   }
 

@@ -35,12 +35,28 @@ window.TypeIndex = (function () {
     let html = `<h2 class="r-tag" id="r-title"><span class="cap">┌─</span><span>${t.title}</span><span class="ln"></span><span class="ct">[ ${String(t.items.length).padStart(2, "0")} ]</span></h2>`;
     html += `<p class="r-blurb">${t.blurb}</p>`;
     t.items.forEach((it, i) => {
-      html += `<div class="entry">
+      const mid = `m-${active}-${i}`;
+      const hasMore = !!it.more;
+      const title = hasMore
+        ? `<h3><button type="button" class="entry-toggle" aria-expanded="false" aria-controls="${mid}">${it.h}</button></h3>`
+        : `<h3>${it.h}</h3>`;
+      let reveal = "";
+      if (hasMore) {
+        const links = (it.links || [])
+          .map((l) => `<a class="xlink" href="${l.h}">${l.l}</a>`).join("");
+        reveal = `<div class="entry-more" id="${mid}" inert>
+            <div class="em-in"><p class="more">${it.more}</p>` +
+          (links ? `<div class="links">${links}</div>` : "") +
+          `</div>
+          </div>`;
+      }
+      html += `<div class="entry${hasMore ? " has-more" : ""}">
         <span class="no">${String(i + 1).padStart(2, "0")}</span>
         <div class="col">
-          <div class="top"><h3>${it.h}</h3><span class="meta">${it.year} · ${it.tag}</span></div>
+          <div class="top">${title}<span class="meta">${it.year} · ${it.tag}</span></div>
           <p>${it.p}</p>
           <span class="state">${it.state}</span>
+          ${reveal}
         </div>
       </div>`;
     });
@@ -53,11 +69,31 @@ window.TypeIndex = (function () {
     html += `</div>`;
 
     reading.innerHTML = html;
+    wireEntries();
     reading.classList.remove("fade");
     void reading.offsetWidth;                // reflow so the fade animation restarts
     reading.classList.add("fade");
 
     posEl.innerHTML = `[ ${active + 1} / ${TYPES.length} ] <b>${t.label}</b>`;
+  }
+
+  function toggleEntry(btn) {                 // open / close one item's reveal
+    const region = document.getElementById(btn.getAttribute("aria-controls"));
+    if (!region) return;
+    const open = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!open));
+    region.classList.toggle("open", !open);
+    region.inert = open;                      // collapsed content is inert (no tab / no AT)
+  }
+
+  function wireEntries() {                     // whole row toggles; links stay clickable
+    reading.querySelectorAll(".entry.has-more").forEach((entry) => {
+      entry.addEventListener("click", (e) => {
+        if (e.target.closest(".xlink")) return;
+        const btn = entry.querySelector(".entry-toggle");
+        if (btn) toggleEntry(btn);
+      });
+    });
   }
 
   function select(i) {                       // wraps around both ends of the list
@@ -75,9 +111,11 @@ window.TypeIndex = (function () {
       const n = parseInt(e.key, 10);
       if (n <= TYPES.length) select(n - 1);
     }
-    else if (e.key === "Enter") {
-      reading.focus({ preventScroll: true });
-      reading.scrollIntoView({ behavior: Atmosphere.reduce ? "auto" : "smooth", block: "start" });
+    else if (e.key === "Enter") {            // jump focus into the items; a focused item toggles itself
+      const ae = document.activeElement;
+      if (ae && ae.classList && ae.classList.contains("entry-toggle")) return;
+      const first = reading.querySelector(".entry-toggle");
+      if (first) { first.focus(); e.preventDefault(); }
     }
   }
 
