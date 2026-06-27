@@ -1014,8 +1014,8 @@ if (!reduceMotion) {
       if (!p.rings) p.rings = [];
       if (p.ringCd === undefined) p.ringCd = 0;
       p.ringCd--;
-      if (p.exc > 0.0012 && p.ringCd <= 0) {         // keeps shedding (ever fainter) for a moment after it settles
-        const str = Math.min(1, p.exc * 170);
+      if (p.exc > 0.0008 && p.ringCd <= 0) {         // keeps shedding (ever fainter) for a moment after it settles
+        const str = Math.min(1, p.exc * 215);
         p.rings.push({ age: 0, maxAge: 14 + str * 46, cx, cy, rx, ry, str }); // bigger disturbance -> longer, farther ring
         p.ringCd = 5;
       }
