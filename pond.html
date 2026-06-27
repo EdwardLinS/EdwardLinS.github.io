@@ -827,17 +827,17 @@ if (!reduceMotion) {
 
     const out = [];
     for (let i = 0; i < n; i++) {
-      const col = (i + 0.5) / n;                       // spread across the width…
-      const u = clamp(col + (rng() - 0.5) * (0.4 / n), 0.12, 0.88); // …with a little jitter
-      const near = i % 2 === 0;                        // alternate depth bands for variety
-      const v = clamp((near ? 0.70 : 0.44) + (rng() - 0.5) * 0.18, 0.30, 0.86);
+      const col = (i + 0.5) / n;                       // evenly spread across the width…
+      const u = clamp(col + (rng() - 0.5) * (0.16 / n), 0.10, 0.90); // …with only a hair of jitter so gaps stay even
+      const zig = i % 2 === 0 ? 0.74 : 0.42;           // zigzag near/far so the band fills top-to-bottom
+      const v = clamp(zig + (rng() - 0.5) * 0.12, 0.32, 0.86);
       const r = clamp(lerp(4.0, 8.6, v * v) * (0.9 + rng() * 0.3), 3.6, 8.8); // nearer = bigger
       const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
       out.push({ u, v, r, ph: rng() * Math.PI * 2, rt: 30 + rng() * 200,
                  ox: 0, oy: 0, vx: 0, vy: 0, bloom });
     }
 
-    // relax: nudge overlapping pads apart in depth (a few cheap passes)
+    // relax: nudge overlapping pads apart (a few cheap passes)
     for (let pass = 0; pass < 6; pass++) {
       for (let i = 0; i < out.length; i++) {
         for (let j = i + 1; j < out.length; j++) {
@@ -847,8 +847,8 @@ if (!reduceMotion) {
           if (Math.abs(du) < su && Math.abs(dv) < sv) {
             const push = (sv - Math.abs(dv)) * 0.5 + 0.01;
             const dir = dv >= 0 ? 1 : -1;
-            a.v = clamp(a.v + dir * push, 0.30, 0.86);
-            b.v = clamp(b.v - dir * push, 0.30, 0.86);
+            a.v = clamp(a.v + dir * push, 0.32, 0.86);
+            b.v = clamp(b.v - dir * push, 0.32, 0.86);
           }
         }
       }
