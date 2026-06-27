@@ -963,9 +963,9 @@ if (!reduceMotion) {
 
     const bcx = Math.round(cx), bcy = Math.round(cy);
     if (standing) {
-      const stemTop = bcy - Math.max(4, Math.round(ry * 1.3 + 3));   // bloom height above water
-      const stemBase = bcy - Math.max(1, Math.round(ry * 0.55));     // emerges at the leaf's back rim
-      for (let rr = stemTop + 1; rr <= stemBase; rr++) putAt(bcx, rr, "|"); // stem, not skewering the leaf
+      const stemTop = bcy - Math.max(3, Math.round(ry * 0.75 + 1.5));  // bloom sits just above its leaf
+      const stemBase = bcy - Math.max(1, Math.round(ry * 0.55));        // emerges at the leaf's back rim
+      for (let rr = stemTop + 1; rr <= stemBase; rr++) putAt(bcx, rr, "|"); // short stem, no skewer
       const hr = Math.max(2.8, rx * 0.62);             // bloom faces the viewer: rounder + a touch larger
       const vr = Math.max(2.2, hr * 0.8);
       drawLotus(bcx, stemTop, hr, vr, true);
