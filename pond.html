@@ -992,12 +992,21 @@ if (!reduceMotion) {
       drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), 4.5);
       dripT = 180 + Math.random() * 220;
     }
-    for (let i = 0; i < pads.length; i++) {          // pads dimple the surface as they bob
+    for (let i = 0; i < pads.length; i++) {          // pads disturb the surface as they sit and bob
       const p = pads[i];
+      const [cu, cv] = padCenter(p, t);
+      const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
+      const rx = p.r * (0.55 + cv * 1.1);            // footprint radius in cells (mirrors drawPad)
+      const ry = rx * 0.5 * (0.62 + 0.5 * cv);
+      const speed = Math.hypot(p.vx, p.vy);          // how vigorously it's drifting right now
       if (--p.rt <= 0) {
-        const [cu, cv] = padCenter(p, t);
-        drop(cu * (COLS - 1), cv * (ROWS - 1), 0.6);
-        p.rt = 260 + Math.random() * 160;
+        const amp = 0.16 * (p.r / PAD_REF_R) * (1 + speed * 120); // bigger pad + more motion = stronger ring
+        const n = Math.max(8, Math.round(rx + ry));
+        for (let k = 0; k < n; k++) {                // shed a faint ring out from the rim
+          const a = (k / n) * Math.PI * 2;
+          drop(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, amp);
+        }
+        p.rt = 64 + Math.random() * 70;              // next ring soon, so the pad keeps breathing
       }
     }
 
