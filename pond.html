@@ -715,15 +715,15 @@ if (!reduceMotion) {
   if (!mount) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const RAMP = " .:-=+*#%@";
-  const FONT = 13;          // glyph size in px
+  const RAMP = " .,:;-=+ox*#%@";
+  const FONT = 10;          // glyph size in px (smaller = denser grid)
   const CELL_W = FONT * 0.6; // mono advance width approx
-  const CELL_H = FONT;       // line height
+  const CELL_H = FONT * 0.92; // tighter line height packs more rows
 
   const pre = document.createElement("pre");
   pre.setAttribute("aria-hidden", "true");
   pre.style.margin = "0";
-  pre.style.lineHeight = "1";
+  pre.style.lineHeight = "0.92";
   pre.style.fontFamily = "var(--mono)";
   pre.style.fontSize = FONT + "px";
   pre.style.color = "rgba(26,23,20,0.55)";
