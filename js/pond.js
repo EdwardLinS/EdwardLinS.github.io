@@ -144,10 +144,10 @@
 
       const out = [];
       for (let i = 0; i < n; i++) {
-        const col = (i + 0.5) / n;                       // evenly spread across the width…
-        const u = clamp(col + (rng() - 0.5) * (0.16 / n), 0.10, 0.90); // …with only a hair of jitter so gaps stay even
-        const zig = i % 2 === 0 ? 0.62 : 0.30;           // zigzag near/far so the band fills top-to-bottom
-        const v = clamp(zig + (rng() - 0.5) * 0.12, 0.20, 0.74);
+        const col = (i + 0.5) / n;                       // rough column…
+        const u = clamp(col + (rng() - 0.5) * (0.85 / n), 0.10, 0.90); // …but with real jitter so gaps come out uneven
+        const base = i % 2 === 0 ? 0.58 : 0.34;          // loose near/far lean, not a strict zigzag
+        const v = clamp(base + (rng() - 0.5) * 0.34, 0.20, 0.74); // wide depth jitter → scattered, asymmetric band
         const r = clamp(lerp(4.0, 8.6, v * v) * (0.9 + rng() * 0.3), 3.6, 8.8); // nearer = bigger
         const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
         out.push(newPad({ u, v, r, ph: rng() * Math.PI * 2, bloom }));
@@ -184,8 +184,8 @@
       pads[lm].r *= 1.28; }
     // two tiny decorative lilies tucked into the gaps — pure surface detail, not part of the type system
     pads.push(
-      newPad({ u: 0.37, v: 0.48, r: 3.0, ph: 1.3, bloom: 0 }),
-      newPad({ u: 0.63, v: 0.52, r: 3.2, ph: 4.1, bloom: 0 })
+      newPad({ u: 0.33, v: 0.43, r: 3.0, ph: 1.3, bloom: 0 }),
+      newPad({ u: 0.71, v: 0.58, r: 3.2, ph: 4.1, bloom: 0 })
     );
 
     // ---- pad drift tuning ----
