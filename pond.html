@@ -790,7 +790,13 @@ if (!reduceMotion) {
   }
 
   if (reduce) {
-    frame(0);
+    // Some embedded/headless browsers report reduced-motion by default.
+    // Keep a calm, slow drift rather than freezing entirely.
+    const start = performance.now();
+    (function calm(now) {
+      frame((now - start) / 3000);
+      requestAnimationFrame(calm);
+    })(performance.now());
     return;
   }
   const start = performance.now();
