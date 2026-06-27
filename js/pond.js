@@ -322,7 +322,7 @@
         const c = 2 + Math.random() * (COLS - 4);
         const hit = Math.max(3, Math.round((0.5 + Math.random() * 0.45) * (ROWS - 1))); // lands lower in the scene
         rain.push({ c, r: 0, vr: 0.6 + Math.random() * 0.5, hit, amp: 5 + Math.random() * 3 });
-        dripT = 200 + Math.random() * 260;
+        dripT = 150 + Math.random() * 200;
       }
       for (let i = rain.length - 1; i >= 0; i--) {
         const d = rain[i];
