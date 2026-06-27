@@ -901,7 +901,7 @@ if (!reduceMotion) {
       ptr.pc = ptr.c; ptr.pr = ptr.r; ptr.moved = false;
     }
     if (--dripT <= 0) {                              // rare, soft idle "raindrops"
-      drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), 1.3);
+      drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), 4.5);
       dripT = 180 + Math.random() * 220;
     }
     for (let i = 0; i < pads.length; i++) {          // pads dimple the surface as they bob
