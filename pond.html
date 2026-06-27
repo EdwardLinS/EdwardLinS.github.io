@@ -732,18 +732,46 @@ if (!reduceMotion) {
   mount.innerHTML = "";
   mount.appendChild(pre);
 
-  let COLS = 0, ROWS = 0;
+  let COLS = 0, ROWS = 0, cur = null, prev = null;
   function resize() {
     const w = Math.max(mount.clientWidth, 280);
     const h = Math.max(mount.clientHeight, 140);
     COLS = Math.max(20, Math.floor(w / CELL_W));
     ROWS = Math.max(8, Math.floor(h / CELL_H));
+    cur = new Float32Array(COLS * ROWS);
+    prev = new Float32Array(COLS * ROWS);
   }
   resize();
   window.addEventListener("resize", resize);
 
-  // cursor in grid coordinates
-  const ptr = { c: 0, r: 0, on: false, e: 0 };
+  // ---- wave engine: each cell relaxes toward the mean of its neighbours,
+  //      minus its previous value, with damping. A local rule that radiates. ----
+  const DAMP = 0.965;   // 1 = no energy loss; lower = ripples fade sooner
+  const GAIN = 0.55;    // how strongly height maps to glyph brightness
+  function drop(c, r, amp) {
+    c |= 0; r |= 0;
+    if (c < 1 || c >= COLS - 1 || r < 1 || r >= ROWS - 1) return;
+    cur[r * COLS + c] += amp;
+  }
+  function step() {
+    for (let r = 1; r < ROWS - 1; r++) {
+      const o = r * COLS;
+      for (let c = 1; c < COLS - 1; c++) {
+        const i = o + c;
+        let v = (cur[i - 1] + cur[i + 1] + cur[i - COLS] + cur[i + COLS]) * 0.5 - prev[i];
+        prev[i] = v * DAMP;
+      }
+    }
+    const tmp = prev; prev = cur; cur = tmp;   // swap buffers
+  }
+  function heightAt(c, r) {
+    c |= 0; r |= 0;
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return 0;
+    return cur[r * COLS + c];
+  }
+
+  // cursor in grid coordinates; leaves a continuous wake of expanding rings
+  const ptr = { c: 0, r: 0, on: false };
   mount.addEventListener("pointermove", (ev) => {
     const b = mount.getBoundingClientRect();
     ptr.c = ((ev.clientX - b.left) / b.width) * COLS;
@@ -751,33 +779,25 @@ if (!reduceMotion) {
     ptr.on = true;
   });
   mount.addEventListener("pointerleave", () => { ptr.on = false; });
+  mount.addEventListener("pointerdown", (ev) => {        // click = one big ring
+    const b = mount.getBoundingClientRect();
+    drop(((ev.clientX - b.left) / b.width) * COLS,
+         ((ev.clientY - b.top) / b.height) * ROWS, 16);
+  });
 
   // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
   const pads = [
-    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0 },
-    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1 },
-    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2 }
+    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30 },
+    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1, rt: 70 },
+    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110 }
   ];
-
-  // base water height (no cursor ripple) used for pad bobbing
-  function baseH(c, r, t) {
-    const v = r / (ROWS - 1);
-    const wy = v * v * 7.0;
-    const spread = 0.45 + 0.9 * v;
-    const fy = 1.1 + (1 - v) * 1.4;
-    const u = c / (COLS - 1);
-    const wx = (u - 0.5) * (COLS * CELL_W / 60) / spread;
-    return Math.sin(wx * 1.05 + t * 0.9)
-         + Math.sin(wy * fy - t * 0.75) * 0.8
-         + Math.sin((wx * 0.7 + wy) + t * 0.5) * 0.45;
-  }
 
   function drawPad(grid, pad, t) {
     const cu = pad.u + Math.sin(t * 0.08 + pad.ph) * 0.022;
     const cv = pad.v + Math.sin(t * 0.11 + pad.ph) * 0.010;
     const cx = cu * (COLS - 1);
     let cy = cv * (ROWS - 1);
-    cy += baseH(cx, cy, t) * 0.6;                 // bob on the swell
+    cy += heightAt(cx, cy) * 0.5;                  // ride the ripples it sits on
 
     const rx = pad.r * (0.55 + cv * 1.1);          // nearer pads are larger
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
@@ -795,8 +815,7 @@ if (!reduceMotion) {
         const dd = ex * ex + ey * ey;
 
         if (dd > 1) {
-          // dark underside edge along the lower rim for thickness
-          if (dd < 1.5 && ey > 0.1) grid[r][c] = "#";
+          if (dd < 1.5 && ey > 0.1) grid[r][c] = "#"; // dark underside edge
           continue;
         }
         const ang = Math.atan2(ey, ex);
@@ -813,35 +832,33 @@ if (!reduceMotion) {
     }
   }
 
+  let dripT = 30;
   function frame(t) {
-    // ease the ripple energy in/out so it feels like a disturbed surface
-    ptr.e += ((ptr.on ? 1 : 0) - ptr.e) * 0.06;
+    // inject energy
+    if (ptr.on) drop(ptr.c, ptr.r, 1.4);            // wake from the moving cursor
+    if (--dripT <= 0) {                              // idle "raindrops" keep it alive
+      drop(1 + Math.random() * (COLS - 2), 1 + Math.random() * (ROWS - 2), reduce ? 1.6 : 3.0);
+      dripT = (reduce ? 70 : 45) + Math.random() * 70;
+    }
+    for (let i = 0; i < pads.length; i++) {          // pads dimple the surface as they bob
+      const p = pads[i];
+      if (--p.rt <= 0) {
+        const cu = p.u + Math.sin(t * 0.08 + p.ph) * 0.022;
+        const cv = p.v + Math.sin(t * 0.11 + p.ph) * 0.010;
+        drop(cu * (COLS - 1), cv * (ROWS - 1), 1.3);
+        p.rt = 120 + Math.random() * 90;
+      }
+    }
+
+    step();
 
     const grid = new Array(ROWS);
     for (let r = 0; r < ROWS; r++) {
-      const v = r / (ROWS - 1);
-      const depth = v * v;
-      const wy = depth * 7.0;
-      const spread = 0.45 + 0.9 * v;
-      const fy = 1.1 + (1 - v) * 1.4;
       const row = new Array(COLS);
+      const o = r * COLS;
       for (let c = 0; c < COLS; c++) {
-        const u = c / (COLS - 1);
-        const wx = (u - 0.5) * (COLS * CELL_W / 60) / spread;
-
-        let hgt = Math.sin(wx * 1.05 + t * 0.9)
-                + Math.sin(wy * fy - t * 0.75) * 0.8
-                + Math.sin((wx * 0.7 + wy) + t * 0.5) * 0.45;
-
-        if (ptr.e > 0.01) {
-          const dx = c - ptr.c;
-          const dy = (r - ptr.r) * 2.0;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          const fall = Math.max(0, 1 - d / 22);
-          hgt += Math.sin(d * 0.55 - t * 5) * fall * fall * 2.2 * ptr.e;
-        }
-
-        let n = (hgt + 2.7) / 5.4;
+        const amb = Math.sin(c * 0.6 + r * 1.05 + t * 1.2) * 0.12; // faint living texture
+        let n = 0.5 + (cur[o + c] * GAIN) + amb;
         if (n < 0) n = 0; else if (n > 1) n = 1;
         row[c] = RAMP[(n * (RAMP.length - 1)) | 0];
       }
@@ -858,16 +875,6 @@ if (!reduceMotion) {
     pre.textContent = out;
   }
 
-  if (reduce) {
-    // Some embedded/headless browsers report reduced-motion by default.
-    // Keep a calm, slow drift rather than freezing entirely.
-    const start = performance.now();
-    (function calm(now) {
-      frame((now - start) / 3000);
-      requestAnimationFrame(calm);
-    })(performance.now());
-    return;
-  }
   const start = performance.now();
   (function loop(now) {
     frame((now - start) / 1000);
