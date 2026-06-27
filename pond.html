@@ -748,6 +748,7 @@ if (!reduceMotion) {
   //      minus its previous value, with damping. A local rule that radiates. ----
   const DAMP = 0.96;    // 1 = no energy loss; lower = ripples fade sooner
   const GAIN = 0.6;     // how strongly a disturbance maps to glyph brightness
+  const WAVE = 0.20;    // wave-speed coefficient (0.5 = fastest stable; lower = slower ripples)
   function drop(c, r, amp) {
     c |= 0; r |= 0;
     if (c < 1 || c >= COLS - 1 || r < 1 || r >= ROWS - 1) return;
@@ -758,7 +759,8 @@ if (!reduceMotion) {
       const o = r * COLS;
       for (let c = 1; c < COLS - 1; c++) {
         const i = o + c;
-        let v = (cur[i - 1] + cur[i + 1] + cur[i - COLS] + cur[i + COLS]) * 0.5 - prev[i];
+        const lap = cur[i - 1] + cur[i + 1] + cur[i - COLS] + cur[i + COLS] - 4 * cur[i];
+        let v = 2 * cur[i] - prev[i] + WAVE * lap;   // discrete wave eqn; WAVE sets speed
         prev[i] = v * DAMP;
       }
     }
