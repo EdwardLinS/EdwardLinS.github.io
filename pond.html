@@ -812,6 +812,11 @@ if (!reduceMotion) {
   const PAD_FRICTION = 0.82;  // velocity damping (lower = settles sooner)
   const PAD_MAXOFF = 0.09;    // max drift from home (fraction of band), keeps pads from wandering
   const PAD_BOB = 1.3;        // vertical rise/fall as a pad rides the swell (rows per unit height)
+  const PAD_REF_R = 4.6;      // a "medium" pad; bigger than this feels heavier, smaller feels lighter
+
+  // heavier pads resist the swell: a big lily pad has more mass, so it bobs and
+  // drifts less and glides back home more lazily than a little one
+  function padWeight(p) { return Math.pow(p.r / PAD_REF_R, 1.3); }
 
   // live centre of a pad: home + slow idle drift + ripple-driven offset
   function padCenter(p, t) {
@@ -826,9 +831,11 @@ if (!reduceMotion) {
     const cy = cv * (ROWS - 1);
     const gx = heightAt(cx + 1, cy) - heightAt(cx - 1, cy);   // surface slope (gradient)
     const gy = heightAt(cx, cy + 1) - heightAt(cx, cy - 1);
-    p.vx += PAD_PUSH * gx - PAD_SPRING * p.ox;
-    p.vy += PAD_PUSH * gy - PAD_SPRING * p.oy;
-    p.vx *= PAD_FRICTION; p.vy *= PAD_FRICTION;
+    const w = padWeight(p);                            // heavier = shoved less, glides longer
+    const fric = Math.min(0.9, PAD_FRICTION + (w - 1) * 0.03);
+    p.vx += (PAD_PUSH * gx - PAD_SPRING * p.ox) / w;
+    p.vy += (PAD_PUSH * gy - PAD_SPRING * p.oy) / w;
+    p.vx *= fric; p.vy *= fric;
     p.ox += p.vx; p.oy += p.vy;
     if (p.ox > PAD_MAXOFF) p.ox = PAD_MAXOFF; else if (p.ox < -PAD_MAXOFF) p.ox = -PAD_MAXOFF;
     if (p.oy > PAD_MAXOFF) p.oy = PAD_MAXOFF; else if (p.oy < -PAD_MAXOFF) p.oy = -PAD_MAXOFF;
@@ -838,7 +845,7 @@ if (!reduceMotion) {
     const [cu, cv] = padCenter(pad, t);
     const cx = cu * (COLS - 1);
     let cy = cv * (ROWS - 1);
-    cy += heightAt(cx, cy) * PAD_BOB;             // ride the ripples it sits on
+    cy += heightAt(cx, cy) * (PAD_BOB / padWeight(pad)); // ride the ripples it sits on (heavier bobs less)
 
     const rx = pad.r * (0.55 + cv * 1.1);          // nearer pads are larger
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
