@@ -1005,29 +1005,37 @@ if (!reduceMotion) {
       d.r += d.vr;
       if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
-    for (let i = 0; i < pads.length; i++) {          // a disturbed pad sheds its own rings — only when the water moves it
+    for (let i = 0; i < pads.length; i++) {          // a pad makes a wake only from its OWN glide — riding a swell adds nothing, so no feedback
       const p = pads[i];
+      const speed = Math.hypot(p.vx, p.vy);          // its drift velocity across the water
+      if (speed < 0.0016) continue;                  // essentially still -> no ripple at all
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
-      const rx = p.r * (0.55 + cv * 1.1);            // footprint radius in cells (mirrors drawPad)
+      const rx = p.r * (0.55 + cv * 1.1);
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
-      const speed = Math.hypot(p.vx, p.vy);          // how vigorously it's drifting right now
-      // disturbance = the swell passing under the pad + its own drift. Calm water => ~0 => no ripple.
-      const disturb = Math.abs(heightAt(cx | 0, cy | 0)) + speed * 220;
-      p.rt -= 1 + disturb * 6;                        // ripples come faster the more the pad is tossed
-      if (p.rt <= 0 && disturb > 0.18) {
-        let amp = 0.5 * (p.r / PAD_REF_R) * disturb;  // ring strength tracks how hard it's bobbing
-        if (amp > 1.1) amp = 1.1;
+      p.rt -= 1 + speed * 400;                        // wake repeats faster the quicker it glides
+      if (p.rt <= 0) {
+        const amp = 0.10 * (p.r / PAD_REF_R) * Math.min(1, speed * 200); // tiny wake, well under the damping loss
         const n = Math.max(10, Math.round((rx + ry) * 1.2));
-        for (let k = 0; k < n; k++) {                // shed an elliptical ring out from the rim
+        for (let k = 0; k < n; k++) {                // faint elliptical ring trailing the moving pad
           const a = (k / n) * Math.PI * 2;
-          drop(cx + Math.cos(a) * rx * 1.08, cy + Math.sin(a) * ry * 1.08, amp);
+          drop(cx + Math.cos(a) * rx * 1.06, cy + Math.sin(a) * ry * 1.06, amp);
         }
-        p.rt = 26 + Math.random() * 24;
+        p.rt = 30 + Math.random() * 20;
       }
     }
 
     step();
+
+    // safety governor: the field should only ever lose energy. If anything ever
+    // pumps it upward, bleed the whole surface back down so nothing can run away.
+    let sAbs = 0;
+    for (let k = 0; k < cur.length; k += 7) sAbs += Math.abs(cur[k]);
+    const meanAbs = sAbs / (cur.length / 7);
+    if (meanAbs > 2.0) {
+      const f = 2.0 / meanAbs;
+      for (let k = 0; k < cur.length; k++) { cur[k] *= f; prev[k] *= f; }
+    }
 
     for (let i = 0; i < pads.length; i++) driftPad(pads[i], t);  // ripples shove pads, tether pulls home
 
