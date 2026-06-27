@@ -867,11 +867,11 @@ if (!reduceMotion) {
   const pads = makePads(PAD_COUNT, PAD_SEED);
 
   // ---- pad drift tuning ----
-  const PAD_PUSH = 0.006;     // how hard a passing ripple shoves a pad
+  const PAD_PUSH = 0.0026;    // how hard a passing ripple shoves a pad — pads jostle in place, not sail away
   const PAD_SPRING = 0.006;   // tether pulling each pad back to its home position (lower = slower float-back)
   const PAD_FRICTION = 0.82;  // velocity damping (lower = settles sooner)
-  const PAD_MAXOFF = 0.09;    // max drift from home (fraction of band), keeps pads from wandering
-  const PAD_BOB = 1.3;        // vertical rise/fall as a pad rides the swell (rows per unit height)
+  const PAD_MAXOFF = 0.035;   // max drift from home (fraction of band) — kept small so pads barely wander
+  const PAD_BOB = 1.05;       // vertical rise/fall as a pad rides the swell (rows per unit height)
   const PAD_REF_R = 4.6;      // a "medium" pad; bigger than this feels heavier, smaller feels lighter
 
   // heavier pads resist the swell: a big lily pad has more mass, so it bobs and
