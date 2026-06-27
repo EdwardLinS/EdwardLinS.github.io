@@ -109,9 +109,8 @@
     // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
     // ox/oy = current drift offset from home; vx/vy = drift velocity (normalised u/v units)
     // bloom: 0 = closed bud, 1 = small open flower, 2 = full lotus bloom
-    // Pads are generated from a fixed seed: deterministic (no reshuffle on reload),
-    // but data-driven — change the count and the pond re-lays itself out, never overlapping.
-    const PAD_SEED = 0x5eed1eaf;
+    // A fresh random seed each load reshuffles the pond's layout; pass opts.seed to pin it.
+    const PAD_SEED = (opts.seed != null ? opts.seed : (Math.random() * 0xffffffff)) >>> 0;
     const PAD_COUNT = opts.count || 5;
 
     function mulberry32(a) {                            // tiny deterministic RNG
@@ -153,6 +152,16 @@
         out.push(newPad({ u, v, r, ph: rng() * Math.PI * 2, bloom }));
       }
 
+      // two tiny filler buds tucked into the gaps — surface detail, not type pads.
+      // added before the relax pass so they're de-overlapped along with everything else.
+      for (let k = 0; k < 2; k++) {
+        out.push(newPad({
+          u: clamp(0.18 + rng() * 0.64, 0.12, 0.88),
+          v: clamp(0.30 + rng() * 0.34, 0.20, 0.74),
+          r: 3.0 + rng() * 0.5, ph: rng() * Math.PI * 2, bloom: 0
+        }));
+      }
+
       // relax: nudge overlapping pads apart (a few cheap passes)
       for (let pass = 0; pass < 6; pass++) {
         for (let i = 0; i < out.length; i++) {
@@ -179,14 +188,9 @@
     }
 
     const pads = makePads(PAD_COUNT, PAD_SEED);
-    // make the far-left type pad the largest — anchors that corner of the pond
+    // make the far-left pad the largest — anchors that corner of the pond
     { let lm = 0; for (let i = 1; i < pads.length; i++) if (pads[i].u < pads[lm].u) lm = i;
       pads[lm].r *= 1.28; }
-    // two tiny decorative lilies tucked into the gaps — pure surface detail, not part of the type system
-    pads.push(
-      newPad({ u: 0.33, v: 0.43, r: 3.0, ph: 1.3, bloom: 0 }),
-      newPad({ u: 0.71, v: 0.58, r: 3.2, ph: 4.1, bloom: 0 })
-    );
 
     // ---- pad drift tuning ----
     const PAD_PUSH = 0.0026;    // how hard a passing ripple shoves a pad — pads jostle in place, not sail away
