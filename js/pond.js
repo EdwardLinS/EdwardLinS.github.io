@@ -146,8 +146,8 @@
       for (let i = 0; i < n; i++) {
         const col = (i + 0.5) / n;                       // evenly spread across the width…
         const u = clamp(col + (rng() - 0.5) * (0.16 / n), 0.10, 0.90); // …with only a hair of jitter so gaps stay even
-        const zig = i % 2 === 0 ? 0.74 : 0.42;           // zigzag near/far so the band fills top-to-bottom
-        const v = clamp(zig + (rng() - 0.5) * 0.12, 0.32, 0.86);
+        const zig = i % 2 === 0 ? 0.62 : 0.30;           // zigzag near/far so the band fills top-to-bottom
+        const v = clamp(zig + (rng() - 0.5) * 0.12, 0.20, 0.74);
         const r = clamp(lerp(4.0, 8.6, v * v) * (0.9 + rng() * 0.3), 3.6, 8.8); // nearer = bigger
         const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
         out.push(newPad({ u, v, r, ph: rng() * Math.PI * 2, bloom }));
@@ -163,8 +163,8 @@
             if (Math.abs(du) < su && Math.abs(dv) < sv) {
               const push = (sv - Math.abs(dv)) * 0.5 + 0.01;
               const dir = dv >= 0 ? 1 : -1;
-              a.v = clamp(a.v + dir * push, 0.32, 0.86);
-              b.v = clamp(b.v - dir * push, 0.32, 0.86);
+              a.v = clamp(a.v + dir * push, 0.20, 0.74);
+              b.v = clamp(b.v - dir * push, 0.20, 0.74);
             }
           }
         }
@@ -184,8 +184,8 @@
       pads[lm].r *= 1.28; }
     // two tiny decorative lilies tucked into the gaps — pure surface detail, not part of the type system
     pads.push(
-      newPad({ u: 0.37, v: 0.60, r: 3.0, ph: 1.3, bloom: 0 }),
-      newPad({ u: 0.63, v: 0.64, r: 3.2, ph: 4.1, bloom: 0 })
+      newPad({ u: 0.37, v: 0.48, r: 3.0, ph: 1.3, bloom: 0 }),
+      newPad({ u: 0.63, v: 0.52, r: 3.2, ph: 4.1, bloom: 0 })
     );
 
     // ---- pad drift tuning ----
