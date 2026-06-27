@@ -871,21 +871,25 @@ if (!reduceMotion) {
       }
     }
 
-    // ---- centrepiece: lotus bud or bloom, stamped on top of the leaf ----
+    // ---- centrepiece: lotus bud or radial bloom, stamped on the leaf ----
     const bcx = Math.round(cx), bcy = Math.round(cy);
     const put = (dc, dr, ch) => {
       const rr = bcy + dr, cc = bcx + dc;
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
     };
-    if (pad.bloom && rx > 2.2) {
-      put(0, 0, "*");                                // flower heart
-      put(-1, -1, "\\"); put(1, -1, "/");            // diagonal petals
+    if (pad.bloom > 1 && rx > 2.8) {
+      // full lotus: radial starburst — petals all point outward from the heart
+      put(0, 0, "@");                                  // flower heart
+      put(0, -1, "|"); put(0, 1, "|");                 // N / S petals
+      put(-1, 0, "-"); put(1, 0, "-");                 // W / E petals
+      put(-1, -1, "\\"); put(1, -1, "/");              // diagonal petals
       put(-1, 1, "/"); put(1, 1, "\\");
-      if (pad.bloom > 1) {                            // fuller bloom: add cardinal petals
-        put(0, -1, "'"); put(0, 1, "."); put(-1, 0, "("); put(1, 0, ")");
-      }
+    } else if (pad.bloom >= 1 && rx > 2.2) {
+      // small flower: simple four-petal cross
+      put(0, 0, "o");
+      put(0, -1, "'"); put(0, 1, ","); put(-1, 0, "-"); put(1, 0, "-");
     } else {
-      put(0, 0, "o");                                // closed lotus bud
+      put(0, 0, "o");                                  // closed lotus bud
     }
   }
 
