@@ -871,26 +871,15 @@ if (!reduceMotion) {
       }
     }
 
-    // ---- centrepiece: lotus bud or radial bloom, stamped on the leaf ----
+    // ---- centrepiece: a single clean mark — bud or open bloom ----
     const bcx = Math.round(cx), bcy = Math.round(cy);
     const put = (dc, dr, ch) => {
       const rr = bcy + dr, cc = bcx + dc;
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
     };
-    if (pad.bloom > 1 && rx > 2.8) {
-      // full lotus: radial starburst — petals all point outward from the heart
-      put(0, 0, "@");                                  // flower heart
-      put(0, -1, "|"); put(0, 1, "|");                 // N / S petals
-      put(-1, 0, "-"); put(1, 0, "-");                 // W / E petals
-      put(-1, -1, "\\"); put(1, -1, "/");              // diagonal petals
-      put(-1, 1, "/"); put(1, 1, "\\");
-    } else if (pad.bloom >= 1 && rx > 2.2) {
-      // small flower: simple four-petal cross
-      put(0, 0, "o");
-      put(0, -1, "'"); put(0, 1, ","); put(-1, 0, "-"); put(1, 0, "-");
-    } else {
-      put(0, 0, "o");                                  // closed lotus bud
-    }
+    if (pad.bloom > 1 && rx > 2.4) put(0, 0, "*");       // open lotus
+    else if (pad.bloom >= 1 && rx > 2.0) put(0, 0, "o"); // small flower
+    else put(0, 0, ".");                                 // tight bud
   }
 
   let dripT = 120;
