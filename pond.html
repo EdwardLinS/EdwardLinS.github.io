@@ -825,10 +825,10 @@ if (!reduceMotion) {
     const out = [];
     for (let i = 0; i < n; i++) {
       const col = (i + 0.5) / n;                       // spread across the width…
-      const u = clamp(col + (rng() - 0.5) * (0.7 / n), 0.08, 0.92); // …with a little jitter
+      const u = clamp(col + (rng() - 0.5) * (0.4 / n), 0.12, 0.88); // …with a little jitter
       const near = i % 2 === 0;                        // alternate depth bands for variety
-      const v = clamp((near ? 0.60 : 0.30) + (rng() - 0.5) * 0.22, 0.18, 0.80);
-      const r = clamp(lerp(3.0, 7.3, v * v) * (0.82 + rng() * 0.36), 2.8, 7.6); // nearer = bigger
+      const v = clamp((near ? 0.70 : 0.44) + (rng() - 0.5) * 0.18, 0.30, 0.86);
+      const r = clamp(lerp(4.0, 8.6, v * v) * (0.9 + rng() * 0.3), 3.6, 8.8); // nearer = bigger
       const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
       out.push({ u, v, r, ph: rng() * Math.PI * 2, rt: 30 + rng() * 200,
                  ox: 0, oy: 0, vx: 0, vy: 0, bloom });
@@ -844,8 +844,8 @@ if (!reduceMotion) {
           if (Math.abs(du) < su && Math.abs(dv) < sv) {
             const push = (sv - Math.abs(dv)) * 0.5 + 0.01;
             const dir = dv >= 0 ? 1 : -1;
-            a.v = clamp(a.v + dir * push, 0.18, 0.80);
-            b.v = clamp(b.v - dir * push, 0.18, 0.80);
+            a.v = clamp(a.v + dir * push, 0.30, 0.86);
+            b.v = clamp(b.v - dir * push, 0.30, 0.86);
           }
         }
       }
