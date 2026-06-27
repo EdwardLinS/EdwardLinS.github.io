@@ -1005,7 +1005,7 @@ if (!reduceMotion) {
       d.r += d.vr;
       if (d.r >= d.hit) { drop(d.c, d.hit, d.amp); rain.splice(i, 1); }  // strong splash ring on impact
     }
-    for (let i = 0; i < pads.length; i++) {          // a pad rings out when the swell BOBS it — like a real lily pad nodding in the rain
+    for (let i = 0; i < pads.length; i++) {          // when the swell BOBS a pad, it sheds an expanding ring (drawn over the water, never fed into the sim -> cannot run away)
       const p = pads[i];
       const [cu, cv] = padCenter(p, t);
       const cx = cu * (COLS - 1), cy = cv * (ROWS - 1);
@@ -1013,21 +1013,19 @@ if (!reduceMotion) {
       if (p.prevH === undefined) p.prevH = h;
       const bobVel = Math.abs(h - p.prevH);          // how fast it's rising/falling this frame
       p.prevH = h;
-      const speed = Math.hypot(p.vx, p.vy);          // plus any glide of its own
+      const speed = Math.hypot(p.vx, p.vy);
       const activity = bobVel + speed * 60;          // total motion that would shed a ripple
-      if (activity < 0.012) continue;                // barely moving -> stay quiet
       const rx = p.r * (0.55 + cv * 1.1);
       const ry = rx * 0.5 * (0.62 + 0.5 * cv);
-      p.rt -= 1 + activity * 18;                      // rings come faster the more it nods
-      if (p.rt <= 0) {
-        let amp = 0.32 * (p.r / PAD_REF_R) * activity; // small, capped: a reaction, never a pump
-        if (amp > 0.13) amp = 0.13;
-        const n = Math.max(10, Math.round((rx + ry) * 1.2));
-        for (let k = 0; k < n; k++) {                // faint elliptical ring shed from the rim
-          const a = (k / n) * Math.PI * 2;
-          drop(cx + Math.cos(a) * rx * 1.06, cy + Math.sin(a) * ry * 1.06, amp);
-        }
-        p.rt = 22 + Math.random() * 16;
+      if (!p.rings) p.rings = [];
+      if (p.ringCd === undefined) p.ringCd = 0;
+      p.ringCd--;
+      if (activity > 0.045 && p.ringCd <= 0) {       // a fresh ring leaves the rim while it's being worked
+        p.rings.push({ age: 0, maxAge: 40, cx, cy, rx, ry, str: Math.min(1, activity * 5) });
+        p.ringCd = 9;
+      }
+      for (let k = p.rings.length - 1; k >= 0; k--) { // age the rings out
+        if (++p.rings[k].age > p.rings[k].maxAge) p.rings.splice(k, 1);
       }
     }
 
@@ -1065,6 +1063,28 @@ if (!reduceMotion) {
         row[c] = RAMP[(n * (RAMP.length - 1)) | 0];
       }
       grid[r] = row;
+    }
+
+    for (let i = 0; i < pads.length; i++) {          // expanding rings shed by bobbing pads — cosmetic overlay on calm water
+      const p = pads[i];
+      if (!p.rings) continue;
+      for (let j = 0; j < p.rings.length; j++) {
+        const g = p.rings[j];
+        const f = g.age / g.maxAge;                  // 0 (just shed) -> 1 (faded)
+        const grow = 1 + f * 2.6;                    // ring widens outward from the rim
+        const er = g.rx * grow, ev = g.ry * grow;
+        const lvl = Math.round((1 - f) * 3 * g.str); // fades as it spreads
+        if (lvl <= 0) continue;
+        const ch = ".:-="[Math.min(3, lvl)] || ".";
+        const n = Math.max(14, Math.round((er + ev) * 1.5));
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2;
+          const cc = Math.round(g.cx + Math.cos(a) * er);
+          const rr = Math.round(g.cy + Math.sin(a) * ev);
+          if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === " ")
+            grid[rr][cc] = ch;                        // only over blank water, so it never clobbers waves or pads
+        }
+      }
     }
 
     const order = pads.map((_, i) => i).sort((a, b) => padCenter(pads[a], t)[1] - padCenter(pads[b], t)[1]);
