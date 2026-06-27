@@ -844,6 +844,7 @@ if (!reduceMotion) {
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
     const NOTCH = Math.PI / 2;                      // notch faces the viewer (down)
     const SLIT = 0.16;                              // half-width of the notch slit
+    const isBloom = pad.bloom >= 1 && rx > 2.2;     // big enough to hold an open flower
 
     const r0 = Math.max(0, Math.floor(cy - ry - 2));
     const r1 = Math.min(ROWS - 1, Math.ceil(cy + ry + 2));
@@ -865,21 +866,31 @@ if (!reduceMotion) {
 
         if (dd > 0.82) {
           grid[r][c] = ey < -0.35 ? "=" : "@";     // upper rim catches light
+        } else if (isBloom && dd < 0.34) {
+          grid[r][c] = " ";                          // clear an open flower bed
         } else {
           grid[r][c] = "+";                          // leaf body
         }
       }
     }
 
-    // ---- centrepiece: a single clean mark — bud or open bloom ----
+    // ---- lotus, stamped into the cleared bed so it reads off the leaf ----
     const bcx = Math.round(cx), bcy = Math.round(cy);
     const put = (dc, dr, ch) => {
       const rr = bcy + dr, cc = bcx + dc;
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
     };
-    if (pad.bloom > 1 && rx > 2.4) put(0, 0, "*");       // open lotus
-    else if (pad.bloom >= 1 && rx > 2.0) put(0, 0, "o"); // small flower
-    else put(0, 0, ".");                                 // tight bud
+    if (isBloom) {
+      put(0, 0, "@");                                // golden heart
+      put(0, -1, "o"); put(0, 1, "o");               // four cardinal petals
+      put(-1, 0, "o"); put(1, 0, "o");
+      if (pad.bloom > 1 && rx > 2.8) {               // full lotus: second ring of petals
+        put(-1, -1, "."); put(1, -1, ".");
+        put(-1, 1, "."); put(1, 1, ".");
+      }
+    } else {
+      put(0, 0, "o");                                // closed lotus bud
+    }
   }
 
   let dripT = 120;
