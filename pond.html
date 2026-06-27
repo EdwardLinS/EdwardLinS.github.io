@@ -828,7 +828,7 @@ if (!reduceMotion) {
       const near = i % 2 === 0;                        // alternate depth bands for variety
       const v = clamp((near ? 0.60 : 0.30) + (rng() - 0.5) * 0.22, 0.18, 0.80);
       const r = clamp(lerp(3.0, 7.3, v * v) * (0.82 + rng() * 0.36), 2.8, 7.6); // nearer = bigger
-      const bloom = r >= 6 ? 2 : r >= 4 ? (rng() < 0.45 ? 2 : 1) : r >= 3.2 ? 1 : (rng() < 0.5 ? 1 : 0);
+      const bloom = r >= 3.4 ? 1 : (rng() < 0.5 ? 1 : 0); // most pads: small flower or bud
       out.push({ u, v, r, ph: rng() * Math.PI * 2, rt: 30 + rng() * 200,
                  ox: 0, oy: 0, vx: 0, vy: 0, bloom });
     }
@@ -849,6 +849,11 @@ if (!reduceMotion) {
         }
       }
     }
+    // the largest one or two pads become standing lotuses (bloom on a raised stem)
+    const bySize = out.map((_, i) => i).sort((a, b) => out[b].r - out[a].r);
+    const nLotus = out.length >= 4 ? 2 : 1;
+    for (let k = 0; k < nLotus && k < bySize.length; k++) out[bySize[k]].bloom = 2;
+
     // closest pad sits in front: redraw order already sorts by v elsewhere
     return out;
   }
@@ -900,9 +905,9 @@ if (!reduceMotion) {
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
     const NOTCH = Math.PI / 2;                      // notch faces the viewer (down)
     const SLIT = 0.16;                              // half-width of the notch slit
-    const isBloom = pad.bloom >= 1 && rx > 2.2;     // big enough to hold an open flower
-    const bigBloom = isBloom && ry >= 2.4;           // enough room for a layered lotus
-    const bedCore = bigBloom ? 0.78 : (isBloom ? 0.34 : 0); // cleared flower bed size
+    const standing = pad.bloom >= 2 && rx > 2.4;    // big pad: lotus raised on a stem
+    const flat = pad.bloom === 1 && rx > 2.2;       // small pad: a little flower lying on it
+    const bedCore = flat ? 0.34 : 0;                 // only flat flowers clear a bed in the leaf
 
     const r0 = Math.max(0, Math.floor(cy - ry - 2));
     const r1 = Math.min(ROWS - 1, Math.ceil(cy + ry + 2));
@@ -924,43 +929,50 @@ if (!reduceMotion) {
 
         if (dd > 0.82) {
           grid[r][c] = ey < -0.35 ? "=" : "@";     // upper rim catches light
-        } else if (isBloom && dd < bedCore) {
-          grid[r][c] = " ";                          // clear an open bed for the bloom
+        } else if (flat && dd < bedCore) {
+          grid[r][c] = " ";                          // clear an open bed for a flat flower
         } else {
           grid[r][c] = "+";                          // leaf body
         }
       }
     }
 
-    // ---- lotus: concentric rings of petals stamped into the cleared bed ----
-    const bcx = Math.round(cx), bcy = Math.round(cy);
-    const put = (dc, dr, ch) => {
-      const rr = bcy + dr, cc = bcx + dc;
+    // bounds-checked plotter in absolute grid coords
+    const putAt = (cc, rr, ch) => {
+      cc = Math.round(cc); rr = Math.round(rr);
       if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
     };
-    if (bigBloom) {
-      const spoke = (a) => {                          // stroke aligned to the radial direction
-        const dx = Math.cos(a), dy = Math.sin(a);
-        if (Math.abs(dx) > 2.2 * Math.abs(dy)) return "-";
-        if (Math.abs(dy) > 2.2 * Math.abs(dx)) return "|";
-        return dx * dy > 0 ? "\\" : "/";
-      };
-      const ring = (radF, n, off, ch) => {           // n petals on a perspective ellipse
+    const spoke = (a) => {                            // stroke aligned to the radial direction
+      const dx = Math.cos(a), dy = Math.sin(a);
+      if (Math.abs(dx) > 2.2 * Math.abs(dy)) return "-";
+      if (Math.abs(dy) > 2.2 * Math.abs(dx)) return "|";
+      return dx * dy > 0 ? "\\" : "/";
+    };
+    const drawLotus = (lc, lr, hr, vr, layered) => { // a lotus bloom centred at (lc,lr)
+      const ring = (radF, n, off, ch) => {
         for (let k = 0; k < n; k++) {
           const a = off + (k / n) * Math.PI * 2;
-          put(Math.round(rx * radF * Math.cos(a)),
-              Math.round(ry * radF * Math.sin(a)), ch === null ? spoke(a) : ch);
+          putAt(lc + hr * radF * Math.cos(a), lr + vr * radF * Math.sin(a),
+                ch === null ? spoke(a) : ch);
         }
       };
-      // two interleaved rings of pointed petals = layered lotus
-      if (pad.bloom > 1) ring(0.66, 6, Math.PI / 6, null); // outer petal layer, offset
+      if (layered) ring(0.66, 6, Math.PI / 6, null); // outer petal layer, offset
       ring(0.34, 6, 0, null);                         // inner petal layer
-      // seed-pod heart: a tiny dotted disc
-      put(0, 0, "@"); put(-1, 0, "."); put(1, 0, ".");
-    } else if (isBloom) {
-      put(0, 0, "o"); put(-1, 0, "."); put(1, 0, "."); // tiny flower on a small pad
+      putAt(lc, lr, "@"); putAt(lc - 1, lr, "."); putAt(lc + 1, lr, "."); // seed-pod heart
+    };
+
+    const bcx = Math.round(cx), bcy = Math.round(cy);
+    if (standing) {
+      const stemTop = bcy - Math.max(4, Math.round(ry * 1.3 + 3));   // bloom height above water
+      const stemBase = bcy - Math.max(1, Math.round(ry * 0.55));     // emerges at the leaf's back rim
+      for (let rr = stemTop + 1; rr <= stemBase; rr++) putAt(bcx, rr, "|"); // stem, not skewering the leaf
+      const hr = Math.max(2.8, rx * 0.62);             // bloom faces the viewer: rounder + a touch larger
+      const vr = Math.max(2.2, hr * 0.8);
+      drawLotus(bcx, stemTop, hr, vr, true);
+    } else if (flat) {
+      putAt(bcx, bcy, "o"); putAt(bcx - 1, bcy, "."); putAt(bcx + 1, bcy, "."); // little flower
     } else {
-      put(0, 0, "o");                                 // closed bud
+      putAt(bcx, bcy, "o");                            // closed bud
     }
   }
 
