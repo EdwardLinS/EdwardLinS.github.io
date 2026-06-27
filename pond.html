@@ -802,6 +802,7 @@ if (!reduceMotion) {
     const rx = pad.r * (0.55 + cv * 1.1);          // nearer pads are larger
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
     const NOTCH = Math.PI / 2;                      // notch faces the viewer (down)
+    const SLIT = 0.16;                              // half-width of the notch slit
 
     const r0 = Math.max(0, Math.floor(cy - ry - 2));
     const r1 = Math.min(ROWS - 1, Math.ceil(cy + ry + 2));
@@ -815,21 +816,22 @@ if (!reduceMotion) {
         const dd = ex * ex + ey * ey;
 
         if (dd > 1) {
-          if (dd < 1.5 && ey > 0.1) grid[r][c] = "#"; // dark underside edge
+          if (dd < 1.4 && ey > 0.25) grid[r][c] = "#"; // dark underside edge
           continue;
         }
         const ang = Math.atan2(ey, ex);
-        if (dd > 0.2 && Math.abs(ang - NOTCH) < 0.45) continue; // cut the notch
+        if (dd > 0.28 && Math.abs(ang - NOTCH) < SLIT) continue; // thin notch slit
 
-        if (dd > 0.80) {
-          grid[r][c] = ey < -0.3 ? "=" : "@";      // upper rim catches light
-        } else if (dd < 0.05) {
-          grid[r][c] = "o";                          // center bud
+        if (dd > 0.82) {
+          grid[r][c] = ey < -0.35 ? "=" : "@";     // upper rim catches light
         } else {
-          grid[r][c] = (ex < -0.15 && ey < -0.15) ? ":" : "+"; // highlight vs body
+          grid[r][c] = "+";                          // leaf body
         }
       }
     }
+
+    const bcx = Math.round(cx), bcy = Math.round(cy); // single center bud
+    if (bcy >= 0 && bcy < ROWS && bcx >= 0 && bcx < COLS) grid[bcy][bcx] = "o";
   }
 
   let dripT = 120;
