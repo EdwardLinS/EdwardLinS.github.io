@@ -800,6 +800,7 @@ if (!reduceMotion) {
   const PAD_SPRING = 0.013;   // tether pulling each pad back to its home position
   const PAD_FRICTION = 0.88;  // velocity damping (lower = settles sooner)
   const PAD_MAXOFF = 0.09;    // max drift from home (fraction of band), keeps pads from wandering
+  const PAD_BOB = 1.3;        // vertical rise/fall as a pad rides the swell (rows per unit height)
 
   // live centre of a pad: home + slow idle drift + ripple-driven offset
   function padCenter(p, t) {
@@ -826,7 +827,7 @@ if (!reduceMotion) {
     const [cu, cv] = padCenter(pad, t);
     const cx = cu * (COLS - 1);
     let cy = cv * (ROWS - 1);
-    cy += heightAt(cx, cy) * 0.5;                  // ride the ripples it sits on
+    cy += heightAt(cx, cy) * PAD_BOB;             // ride the ripples it sits on
 
     const rx = pad.r * (0.55 + cv * 1.1);          // nearer pads are larger
     const ry = rx * 0.5 * (0.62 + 0.5 * cv);       // ellipse + perspective squash
