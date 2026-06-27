@@ -798,10 +798,12 @@ if (!reduceMotion) {
 
   // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
   // ox/oy = current drift offset from home; vx/vy = drift velocity (normalised u/v units)
+  // bloom: 0 = closed bud, 1 = small open flower, 2 = full lotus bloom
   const pads = [
-    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30, ox: 0, oy: 0, vx: 0, vy: 0 },
-    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1, rt: 70, ox: 0, oy: 0, vx: 0, vy: 0 },
-    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110, ox: 0, oy: 0, vx: 0, vy: 0 }
+    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 0 },
+    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1, rt: 70, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 2 },
+    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 1 },
+    { u: 0.66, v: 0.26, r: 3.0, ph: 1.1, rt: 50, ox: 0, oy: 0, vx: 0, vy: 0, bloom: 2 }
   ];
 
   // ---- pad drift tuning ----
@@ -869,8 +871,22 @@ if (!reduceMotion) {
       }
     }
 
-    const bcx = Math.round(cx), bcy = Math.round(cy); // single center bud
-    if (bcy >= 0 && bcy < ROWS && bcx >= 0 && bcx < COLS) grid[bcy][bcx] = "o";
+    // ---- centrepiece: lotus bud or bloom, stamped on top of the leaf ----
+    const bcx = Math.round(cx), bcy = Math.round(cy);
+    const put = (dc, dr, ch) => {
+      const rr = bcy + dr, cc = bcx + dc;
+      if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) grid[rr][cc] = ch;
+    };
+    if (pad.bloom && rx > 2.2) {
+      put(0, 0, "*");                                // flower heart
+      put(-1, -1, "\\"); put(1, -1, "/");            // diagonal petals
+      put(-1, 1, "/"); put(1, 1, "\\");
+      if (pad.bloom > 1) {                            // fuller bloom: add cardinal petals
+        put(0, -1, "'"); put(0, 1, "."); put(-1, 0, "("); put(1, 0, ")");
+      }
+    } else {
+      put(0, 0, "o");                                // closed lotus bud
+    }
   }
 
   let dripT = 120;
