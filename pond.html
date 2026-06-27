@@ -788,15 +788,41 @@ if (!reduceMotion) {
   });
 
   // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
+  // ox/oy = current drift offset from home; vx/vy = drift velocity (normalised u/v units)
   const pads = [
-    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30 },
-    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1, rt: 70 },
-    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110 }
+    { u: 0.16, v: 0.34, r: 3.2, ph: 0.0, rt: 30, ox: 0, oy: 0, vx: 0, vy: 0 },
+    { u: 0.50, v: 0.68, r: 4.8, ph: 2.1, rt: 70, ox: 0, oy: 0, vx: 0, vy: 0 },
+    { u: 0.81, v: 0.46, r: 3.8, ph: 4.2, rt: 110, ox: 0, oy: 0, vx: 0, vy: 0 }
   ];
 
+  // ---- pad drift tuning ----
+  const PAD_PUSH = 0.0009;    // how hard a passing ripple shoves a pad
+  const PAD_SPRING = 0.018;   // tether pulling each pad back to its home position
+  const PAD_FRICTION = 0.86;  // velocity damping (lower = settles sooner)
+  const PAD_MAXOFF = 0.05;    // max drift from home (fraction of band), keeps pads from wandering
+
+  // live centre of a pad: home + slow idle drift + ripple-driven offset
+  function padCenter(p, t) {
+    const cu = p.u + Math.sin(t * 0.08 + p.ph) * 0.022 + p.ox;
+    const cv = p.v + Math.sin(t * 0.11 + p.ph) * 0.010 + p.oy;
+    return [cu, cv];
+  }
+
+  function driftPad(p) {                              // shove from wave slope, then spring home
+    const cx = (p.u + p.ox) * (COLS - 1);
+    const cy = (p.v + p.oy) * (ROWS - 1);
+    const gx = heightAt(cx + 1, cy) - heightAt(cx - 1, cy);   // surface slope (gradient)
+    const gy = heightAt(cx, cy + 1) - heightAt(cx, cy - 1);
+    p.vx += PAD_PUSH * gx - PAD_SPRING * p.ox;
+    p.vy += PAD_PUSH * gy - PAD_SPRING * p.oy;
+    p.vx *= PAD_FRICTION; p.vy *= PAD_FRICTION;
+    p.ox += p.vx; p.oy += p.vy;
+    if (p.ox > PAD_MAXOFF) p.ox = PAD_MAXOFF; else if (p.ox < -PAD_MAXOFF) p.ox = -PAD_MAXOFF;
+    if (p.oy > PAD_MAXOFF) p.oy = PAD_MAXOFF; else if (p.oy < -PAD_MAXOFF) p.oy = -PAD_MAXOFF;
+  }
+
   function drawPad(grid, pad, t) {
-    const cu = pad.u + Math.sin(t * 0.08 + pad.ph) * 0.022;
-    const cv = pad.v + Math.sin(t * 0.11 + pad.ph) * 0.010;
+    const [cu, cv] = padCenter(pad, t);
     const cx = cu * (COLS - 1);
     let cy = cv * (ROWS - 1);
     cy += heightAt(cx, cy) * 0.5;                  // ride the ripples it sits on
@@ -847,14 +873,15 @@ if (!reduceMotion) {
     for (let i = 0; i < pads.length; i++) {          // pads dimple the surface as they bob
       const p = pads[i];
       if (--p.rt <= 0) {
-        const cu = p.u + Math.sin(t * 0.08 + p.ph) * 0.022;
-        const cv = p.v + Math.sin(t * 0.11 + p.ph) * 0.010;
+        const [cu, cv] = padCenter(p, t);
         drop(cu * (COLS - 1), cv * (ROWS - 1), 0.6);
         p.rt = 260 + Math.random() * 160;
       }
     }
 
     step();
+
+    for (let i = 0; i < pads.length; i++) driftPad(pads[i]);  // ripples shove pads, tether pulls home
 
     const grid = new Array(ROWS);
     for (let r = 0; r < ROWS; r++) {
