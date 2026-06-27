@@ -8,6 +8,7 @@ window.TypeIndex = (function () {
   const reading = document.getElementById("reading");
   const posEl = document.getElementById("pos");
   let active = 0;
+  let initialized = false;
   const wordEls = [];
 
   function build() {                         // one button per type, in the left-hand index
@@ -31,7 +32,7 @@ window.TypeIndex = (function () {
       b.setAttribute("aria-current", on ? "true" : "false");
     });
 
-    let html = `<div class="r-tag"><span class="cap">┌─</span><span>${t.title}</span><span class="ln"></span><span class="ct">[ ${String(t.items.length).padStart(2, "0")} ]</span></div>`;
+    let html = `<h2 class="r-tag" id="r-title"><span class="cap">┌─</span><span>${t.title}</span><span class="ln"></span><span class="ct">[ ${String(t.items.length).padStart(2, "0")} ]</span></h2>`;
     html += `<p class="r-blurb">${t.blurb}</p>`;
     t.items.forEach((it, i) => {
       html += `<div class="entry">
@@ -70,7 +71,10 @@ window.TypeIndex = (function () {
   function onKey(e) {
     if (e.key === "ArrowDown") { select(active + 1); e.preventDefault(); }
     else if (e.key === "ArrowUp") { select(active - 1); e.preventDefault(); }
-    else if (/^[1-5]$/.test(e.key)) { select(parseInt(e.key, 10) - 1); }
+    else if (e.key >= "1" && e.key <= "9") {  // jump to type N, bounded by the actual count
+      const n = parseInt(e.key, 10);
+      if (n <= TYPES.length) select(n - 1);
+    }
     else if (e.key === "Enter") {
       reading.focus({ preventScroll: true });
       reading.scrollIntoView({ behavior: Atmosphere.reduce ? "auto" : "smooth", block: "start" });
@@ -78,6 +82,9 @@ window.TypeIndex = (function () {
   }
 
   function init() {
+    if (initialized) return;
+    if (!indexEl || !reading || !posEl) return;
+    initialized = true;
     build();
     render();
     document.addEventListener("keydown", onKey);

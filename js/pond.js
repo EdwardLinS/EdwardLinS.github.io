@@ -5,8 +5,9 @@
 
   // Mount the ASCII pond into `el`. opts.count = number of type pads (default 5).
   function mount(el, opts) {
-    if (!el) return;
+    if (!el) return null;
     opts = opts || {};
+    if (el._pondDestroy) el._pondDestroy();   // idempotent: tear down a prior mount on this element
 
     const RAMP = " .,:;-=+ox*#%@";
     const FONT = 8;           // glyph size in px (smaller = denser grid)
@@ -15,13 +16,10 @@
 
     const pre = document.createElement("pre");
     pre.setAttribute("aria-hidden", "true");
-    pre.style.margin = "0";
-    pre.style.lineHeight = "0.92";
-    pre.style.fontFamily = "var(--mono)";
+    // Presentation lives in CSS (.asciipond > pre). Only the two values coupled
+    // to the grid math (FONT, CELL_H factor) stay here so they can't drift apart.
     pre.style.fontSize = FONT + "px";
-    pre.style.color = "rgba(26,23,20,0.55)";
-    pre.style.whiteSpace = "pre";
-    pre.style.letterSpacing = "0";
+    pre.style.lineHeight = "0.92";
     el.innerHTML = "";
     el.appendChild(pre);
 
@@ -89,7 +87,8 @@
 
     // cursor in grid coordinates; only a *moving* cursor leaves a wake (still mouse = calm)
     const ptr = { c: 0, r: 0, pc: 0, pr: 0, on: false, moved: false };
-    el.addEventListener("pointermove", (ev) => {
+    el.addEventListener("pointermove", onMove);
+    function onMove(ev) {
       const b = el.getBoundingClientRect();
       const nc = ((ev.clientX - b.left) / b.width) * COLS;
       const nr = ((ev.clientY - b.top) / b.height) * ROWS;
@@ -97,13 +96,15 @@
       ptr.c = nc; ptr.r = nr;
       ptr.on = true;
       ptr.moved = true;
-    });
-    el.addEventListener("pointerleave", () => { ptr.on = false; ptr.moved = false; });
-    el.addEventListener("pointerdown", (ev) => {        // click = one big ring
+    }
+    el.addEventListener("pointerleave", onLeave);
+    function onLeave() { ptr.on = false; ptr.moved = false; }
+    el.addEventListener("pointerdown", onDown);
+    function onDown(ev) {        // click = one big ring
       const b = el.getBoundingClientRect();
       drop(((ev.clientX - b.left) / b.width) * COLS,
            ((ev.clientY - b.top) / b.height) * ROWS, 16);
-    });
+    }
 
     // Floating lily pads (u = horizontal 0..1, v = depth 0..1 where 1 is nearest).
     // ox/oy = current drift offset from home; vx/vy = drift velocity (normalised u/v units)
@@ -451,10 +452,23 @@
     }
 
     const start = performance.now();
+    let rafId = 0;
     (function loop(now) {
       frame((now - start) / 1000);
-      requestAnimationFrame(loop);
+      rafId = requestAnimationFrame(loop);
     })(start);
+
+    function destroy() {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", resize);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+      el.removeEventListener("pointerdown", onDown);
+      el.innerHTML = "";
+      delete el._pondDestroy;
+    }
+    el._pondDestroy = destroy;
+    return { destroy };
   }
 
   window.Pond = { mount };

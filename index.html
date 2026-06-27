@@ -10,13 +10,13 @@
 <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div id="pond"></div>
+  <div id="pond" aria-hidden="true"></div>
 
   <main class="page">
-    <div class="head">
+    <header class="head">
       <span class="prompt">edward lin <span class="dim">~/index</span><span class="cursor"></span></span>
       <span class="now" id="now">—</span>
-    </div>
+    </header>
 
     <h1 class="lede">A quiet index of things I make, tend, and chase.</h1>
     <p class="opening"><span class="drop">I keep my work the way some people keep a garden</span> — in categories that are mine, not the industry's. Five of them. Each holds a few finished things, a few unfinished ones, and whatever I happen to be circling this week. Choose a word and stay a while.</p>
@@ -24,10 +24,10 @@
     <div id="asciipond" class="asciipond" aria-hidden="true"><div class="rr-fallback">~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~</div></div>
 
     <div class="body">
-      <nav class="index" id="index">
+      <nav class="index" id="index" aria-label="types">
         <div class="ix-h">the five</div>
       </nav>
-      <section class="reading" id="reading" tabindex="-1"></section>
+      <section class="reading" id="reading" tabindex="-1" aria-labelledby="r-title"></section>
     </div>
   </main>
 
@@ -39,7 +39,7 @@
     <div class="grid">
       <span>Set in <b>Playfair Display</b> &amp; <b>JetBrains Mono</b></span>
       <span>Paper, not pixels — no. <b>006</b></span>
-      <nav>
+      <nav aria-label="elsewhere">
         <a href="#">work</a>
         <a href="#">writing</a>
         <a href="#">contact</a>
@@ -49,7 +49,7 @@
 
   <div class="statusbar">
     <span class="hints"><kbd>↑↓</kbd> move <kbd>1–5</kbd> jump <kbd>↵</kbd> open</span>
-    <span class="pos" id="pos">—</span>
+    <span class="pos" id="pos" role="status" aria-live="polite" aria-atomic="true">—</span>
   </div>
 
   <script src="js/content.js"></script>

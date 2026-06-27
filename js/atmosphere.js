@@ -8,6 +8,7 @@ window.Atmosphere = (function () {
   const pond = document.getElementById("pond");
 
   function ring(cls, left, top, anim, life) {
+    if (!pond) return;
     const r = document.createElement("div");
     r.className = cls;
     r.style.left = left;
